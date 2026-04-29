@@ -193,9 +193,9 @@ class ValidationUtils {
     return rate >= 0 && rate <= 100000000;
   }
 
-  /// Validate night rate multiplier
-  static bool isValidNightRateMultiplier(double multiplier) {
-    return multiplier >= 1.0 && multiplier <= 3.0;
+  /// Validate night bonus
+  static bool isValidNightBonus(double bonus) {
+    return bonus >= 0;
   }
 
   /// Validate month format (YYYY-MM)

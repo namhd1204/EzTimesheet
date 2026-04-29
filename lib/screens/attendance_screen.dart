@@ -1,9 +1,15 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
 import '../utils/utils.dart';
+import '../repositories/repositories.dart';
+import '../services/services.dart';
+import 'calendar_screen.dart';
+import 'settings_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -14,13 +20,17 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
-  final AttendanceRepository _attendanceRepository = getIt<AttendanceRepository>();
+  final AttendanceRepository _attendanceRepository =
+      getIt<AttendanceRepository>();
   final AttendanceService _attendanceService = getIt<AttendanceService>();
+  final MonthLockRepository _monthLockRepository = getIt<MonthLockRepository>();
+  final BackupService _backupService = getIt<BackupService>();
 
   DateTime _selectedDate = DateTime.now();
   List<Employee> _employees = [];
   Map<String, AttendanceRecord?> _attendanceMap = {};
   bool _isLoading = true;
+  bool _isRestoring = false;
   String? _errorMessage;
 
   @override
@@ -54,7 +64,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _attendanceMap = attendanceMap;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error loading data: $e');
+      debugPrint('Stack trace: $stack');
       setState(() {
         _errorMessage = ErrorMessages.generalError;
         _isLoading = false;
@@ -69,36 +81,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _loadData();
   }
 
-  Future<void> _recordAttendance(
-    String employeeId,
-    AttendanceType type,
-  ) async {
-    try {
-      await _attendanceService.recordAttendance(employeeId, _selectedDate, type);
-
-      // Reload data
-      await _loadData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã ghi nhận chấm công')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    }
-  }
-
   Future<void> _updateAttendance(
-    String recordId,
-    AttendanceType newType,
-  ) async {
+    String employeeId, {
+    WorkStatus? workStatus,
+    bool? hasNightShift,
+  }) async {
     try {
-      await _attendanceService.updateAttendance(recordId, newType);
+      await _attendanceService.updateAttendanceStatus(
+        employeeId,
+        _selectedDate,
+        workStatus: workStatus,
+        hasNightShift: hasNightShift,
+      );
 
       // Reload data
       await _loadData();
@@ -106,27 +100,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã cập nhật chấm công')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteAttendance(String recordId) async {
-    try {
-      await _attendanceService.deleteAttendance(recordId);
-
-      // Reload data
-      await _loadData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa chấm công')),
         );
       }
     } catch (e) {
@@ -148,6 +121,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             icon: const Icon(Icons.calendar_today),
             onPressed: _showDatePicker,
             tooltip: 'Chọn ngày',
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CalendarScreen()),
+            ),
+            tooltip: 'Xem lịch',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            ),
+            tooltip: 'Cài đặt',
           ),
         ],
       ),
@@ -199,6 +188,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 color: AppTheme.textTertiary,
               ),
             ),
+            const SizedBox(height: AppTheme.space4),
+            if (_isRestoring)
+              const CircularProgressIndicator()
+            else
+              ElevatedButton.icon(
+                onPressed: _restoreFromDrive,
+                icon: const Icon(Icons.cloud_download),
+                label: const Text('Khôi phục từ Drive'),
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
           ],
         ),
       );
@@ -231,10 +233,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   backgroundColor: AppTheme.primary,
                   child: employee.photoPath != null
                       ? ClipOval(
-                          child: Image.file(
-                            File(employee.photoPath!),
-                            fit: BoxFit.cover,
-                          ),
+                          child: kIsWeb
+                              ? Image.network(
+                                  employee.photoPath!,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  File(employee.photoPath!),
+                                  fit: BoxFit.cover,
+                                ),
                         )
                       : Text(
                           employee.name[0].toUpperCase(),
@@ -266,143 +273,153 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
             const SizedBox(height: AppTheme.space3),
 
-            // Attendance status or buttons
-            if (attendance != null)
-              _buildAttendanceStatus(attendance)
-            else
-              _buildAttendanceButtons(employee),
+            // Persistent Toggle Buttons
+            _buildPersistentButtons(employee, attendance),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAttendanceStatus(AttendanceRecord attendance) {
-    return Container(
-      padding: AppTheme.paddingSmall,
-      decoration: BoxDecoration(
-        color: _getAttendanceTypeColor(attendance.attendanceType).withOpacity(0.1),
-        borderRadius: AppTheme.borderRadiusSmall,
-        border: Border.all(
-          color: _getAttendanceTypeColor(attendance.attendanceType),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                _getAttendanceTypeIcon(attendance.attendanceType),
-                color: _getAttendanceTypeColor(attendance.attendanceType),
-                size: 20,
-              ),
-              const SizedBox(width: AppTheme.space2),
-              Text(
-                attendance.attendanceTypeLabel,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: _getAttendanceTypeColor(attendance.attendanceType),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () => _showEditDialog(attendance),
-                tooltip: 'Sửa',
-                iconSize: 20,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () => _deleteAttendance(attendance.id),
-                tooltip: 'Xóa',
-                color: AppTheme.error,
-                iconSize: 20,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildPersistentButtons(
+      Employee employee, AttendanceRecord? attendance) {
+    final workStatus = attendance?.workStatus ?? WorkStatus.none;
+    final hasNightShift = attendance?.hasNightShift ?? false;
 
-  Widget _buildAttendanceButtons(Employee employee) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             Expanded(
-              child: _buildAttendanceButton(
+              child: _buildToggleButton(
                 label: 'Cả ngày',
-                icon: Icons.check_circle,
-                color: Colors.green,
-                onPressed: () => _recordAttendance(employee.id, AttendanceType.fullDay),
+                icon: Icons.wb_sunny,
+                isActive: workStatus == WorkStatus.fullDay,
+                activeColor: Colors.green,
+                onPressed: () => _toggleWorkStatus(
+                    employee.id, attendance, WorkStatus.fullDay),
               ),
             ),
             const SizedBox(width: AppTheme.space2),
             Expanded(
-              child: _buildAttendanceButton(
+              child: _buildToggleButton(
                 label: 'Nửa ngày',
-                icon: Icons.adjust,
-                color: Colors.orange,
-                onPressed: () => _recordAttendance(employee.id, AttendanceType.halfDay),
+                icon: Icons.wb_twilight,
+                isActive: workStatus == WorkStatus.halfDay,
+                activeColor: Colors.orange,
+                onPressed: () => _toggleWorkStatus(
+                    employee.id, attendance, WorkStatus.halfDay),
               ),
             ),
           ],
         ),
         const SizedBox(height: AppTheme.space2),
-        _buildAttendanceButton(
-          label: 'Có làm tối',
+        _buildToggleButton(
+          label: 'Làm tối',
           icon: Icons.nights_stay,
-          color: Colors.purple,
-          onPressed: () => _recordAttendance(employee.id, AttendanceType.nightWork),
+          isActive: hasNightShift,
+          activeColor: Colors.purple,
+          onPressed: () => _toggleNightShift(employee.id, attendance),
+          isFullWidth: true,
         ),
       ],
     );
   }
 
-  Widget _buildAttendanceButton({
+  Widget _buildToggleButton({
     required String label,
     required IconData icon,
-    required Color color,
+    required bool isActive,
+    required Color activeColor,
     required VoidCallback onPressed,
+    bool isFullWidth = false,
   }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+    return SizedBox(
+      height: 60, // Large button for elders
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(isActive ? Icons.check_circle : icon, size: 24),
+        label: Text(
+          label,
+          style: AppTheme.bodyLarge.copyWith(
+            color: isActive ? Colors.white : activeColor,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isActive ? activeColor : Colors.transparent,
+          foregroundColor: isActive ? Colors.white : activeColor,
+          elevation: isActive ? 4 : 0,
+          side: BorderSide(color: activeColor, width: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppTheme.borderRadiusMedium,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ).copyWith(
+          overlayColor:
+              WidgetStateProperty.all(activeColor.withValues(alpha: 0.1)),
+        ),
       ),
     );
   }
 
-  Color _getAttendanceTypeColor(AttendanceType type) {
-    switch (type) {
-      case AttendanceType.fullDay:
-        return Colors.green;
-      case AttendanceType.halfDay:
-        return Colors.orange;
-      case AttendanceType.nightWork:
-        return Colors.purple;
-    }
+  Future<void> _toggleWorkStatus(String employeeId,
+      AttendanceRecord? attendance, WorkStatus targetStatus) async {
+    if (!await _checkLock()) return;
+
+    final currentStatus = attendance?.workStatus ?? WorkStatus.none;
+    final newStatus =
+        currentStatus == targetStatus ? WorkStatus.none : targetStatus;
+
+    await _updateAttendance(
+      employeeId,
+      workStatus: newStatus,
+      hasNightShift: attendance?.hasNightShift,
+    );
   }
 
-  IconData _getAttendanceTypeIcon(AttendanceType type) {
-    switch (type) {
-      case AttendanceType.fullDay:
-        return Icons.check_circle;
-      case AttendanceType.halfDay:
-        return Icons.adjust;
-      case AttendanceType.nightWork:
-        return Icons.nights_stay;
+  Future<void> _toggleNightShift(
+      String employeeId, AttendanceRecord? attendance) async {
+    if (!await _checkLock()) return;
+
+    final currentNightShift = attendance?.hasNightShift ?? false;
+
+    await _updateAttendance(
+      employeeId,
+      workStatus: attendance?.workStatus,
+      hasNightShift: !currentNightShift,
+    );
+  }
+
+  Future<bool> _checkLock() async {
+    final month = DateFormatters.formatMonthForStorage(_selectedDate);
+    final isLocked = await _monthLockRepository.isLocked(month);
+
+    if (isLocked) {
+      if (!mounted) return false;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Dữ liệu đã chốt'),
+          content: const Text(
+              'Tháng này đã được chốt. Bạn có chắc muốn thay đổi chấm công không?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child:
+                  const Text('Đồng ý', style: TextStyle(color: AppTheme.error)),
+            ),
+          ],
+        ),
+      );
+      return confirmed ?? false;
     }
+    return true;
   }
 
   Future<void> _showDatePicker() async {
@@ -418,81 +435,40 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  Future<void> _showEditDialog(AttendanceRecord attendance) async {
-    final result = await showDialog<AttendanceType>(
-      context: context,
-      builder: (context) => EditAttendanceDialog(currentType: attendance.attendanceType),
-    );
+  Future<void> _restoreFromDrive() async {
+    setState(() {
+      _isRestoring = true;
+    });
 
-    if (result != null) {
-      await _updateAttendance(attendance.id, result);
+    try {
+      final summary = await _backupService.restoreFromDrive();
+      if (summary != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã khôi phục thành công.')),
+          );
+        }
+        _loadData();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Không tìm thấy bản sao lưu trên Drive.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khôi phục: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoring = false;
+        });
+      }
     }
-  }
-}
-
-class EditAttendanceDialog extends StatelessWidget {
-  final AttendanceType currentType;
-
-  const EditAttendanceDialog({super.key, required this.currentType});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Sửa chấm công'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildAttendanceTypeOption(
-            context,
-            AttendanceType.fullDay,
-            'Cả ngày',
-            Icons.check_circle,
-            Colors.green,
-          ),
-          const SizedBox(height: AppTheme.space2),
-          _buildAttendanceTypeOption(
-            context,
-            AttendanceType.halfDay,
-            'Nửa ngày',
-            Icons.adjust,
-            Colors.orange,
-          ),
-          const SizedBox(height: AppTheme.space2),
-          _buildAttendanceTypeOption(
-            context,
-            AttendanceType.nightWork,
-            'Có làm tối',
-            Icons.nights_stay,
-            Colors.purple,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAttendanceTypeOption(
-    BuildContext context,
-    AttendanceType type,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
-    final isSelected = type == currentType;
-
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label),
-      trailing: isSelected
-          ? Icon(Icons.check_circle, color: color)
-          : null,
-      selected: isSelected,
-      onTap: () => Navigator.pop(context, type),
-    );
   }
 }

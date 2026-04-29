@@ -12,17 +12,25 @@ dependencies:
   cupertino_icons: ^1.0.2
   get_it: ^7.6.4
   sqflite: ^2.3.0
-  sqflite_migration: ^2.0.0
+  path: ^1.8.3
+  google_fonts: ^6.1.0
+  sqflite_migration: ^0.3.0
+  sqflite_common_ffi_web: ^1.1.1
   path_provider: ^2.1.1
   image_picker: ^1.0.4
   battery_plus: ^5.0.2
   intl: ^0.18.1
   uuid: ^4.2.1
+  google_sign_in: ^6.1.5
+  googleapis: ^11.4.0
+  http: ^1.1.0
+  shared_preferences: ^2.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  sqflite_common_ffi: ^2.3.2
 
 flutter:
   uses-material-design: true

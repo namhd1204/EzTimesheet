@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
+import 'employee_history_screen.dart';
 import '../utils/utils.dart';
+import '../repositories/repositories.dart';
+import 'settings_screen.dart';
 
 class EmployeeScreen extends StatefulWidget {
   const EmployeeScreen({super.key});
@@ -16,8 +19,6 @@ class EmployeeScreen extends StatefulWidget {
 
 class _EmployeeScreenState extends State<EmployeeScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
-  final ImagePicker _imagePicker = ImagePicker();
-
   List<Employee> _employees = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -115,6 +116,14 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             onPressed: _showAddEmployeeDialog,
             tooltip: 'Thêm nhân viên',
           ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            ),
+            tooltip: 'Cài đặt',
+          ),
         ],
       ),
       body: _buildBody(),
@@ -186,13 +195,18 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: AppTheme.primary,
-              child: employee.photoPath != null
-                  ? ClipOval(
-                      child: Image.file(
-                        File(employee.photoPath!),
-                        fit: BoxFit.cover,
-                      ),
-                    )
+                  child: employee.photoPath != null
+                      ? ClipOval(
+                          child: kIsWeb
+                              ? Image.network(
+                                  employee.photoPath!,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  File(employee.photoPath!),
+                                  fit: BoxFit.cover,
+                                ),
+                        )
                   : Text(
                       employee.name[0].toUpperCase(),
                       style: AppTheme.headlineSmall.copyWith(
@@ -211,6 +225,18 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.history),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EmployeeHistoryScreen(employee: employee),
+                      ),
+                    );
+                  },
+                  tooltip: 'Lịch sử chấm công',
+                ),
                 IconButton(
                   icon: const Icon(Icons.visibility),
                   onPressed: () => _showEmployeeDetails(employee),
@@ -344,10 +370,15 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
                   ),
                   child: _photoPath != null
                       ? ClipOval(
-                          child: Image.file(
-                            File(_photoPath!),
-                            fit: BoxFit.cover,
-                          ),
+                          child: kIsWeb
+                              ? Image.network(
+                                  _photoPath!,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  File(_photoPath!),
+                                  fit: BoxFit.cover,
+                                ),
                         )
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -473,10 +504,15 @@ class EmployeeDetailsDialog extends StatelessWidget {
                 ),
                 child: employee.photoPath != null
                     ? ClipOval(
-                        child: Image.file(
-                          File(employee.photoPath!),
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb
+                            ? Image.network(
+                                employee.photoPath!,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.file(
+                                File(employee.photoPath!),
+                                fit: BoxFit.cover,
+                              ),
                       )
                     : Center(
                         child: Text(

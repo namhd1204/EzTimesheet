@@ -1,7 +1,7 @@
 import 'package:get_it/get_it.dart';
-import 'database/database_helper.dart';
-import 'repositories/repositories.dart';
-import 'services/services.dart';
+import '../database/database_helper.dart';
+import '../repositories/repositories.dart';
+import '../services/services.dart';
 
 /// Service locator for dependency injection
 final getIt = GetIt.instance;
@@ -23,8 +23,13 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<MonthlyRateRepository>(
     MonthlyRateRepositoryImpl(getIt<DatabaseHelper>()),
   );
+  getIt.registerSingleton<MonthLockRepository>(
+    MonthLockRepositoryImpl(getIt<DatabaseHelper>()),
+  );
 
   // Services
+  getIt.registerSingleton<GoogleDriveService>(GoogleDriveService());
+  
   getIt.registerSingleton<AttendanceService>(
     AttendanceService(
       getIt<AttendanceRepository>(),
@@ -42,6 +47,8 @@ Future<void> setupServiceLocator() async {
       getIt<EmployeeRepository>(),
       getIt<AttendanceRepository>(),
       getIt<MonthlyRateRepository>(),
+      getIt<MonthLockRepository>(),
+      getIt<GoogleDriveService>(),
     ),
   );
 }

@@ -5,7 +5,7 @@ class MonthlyRate {
   final String employeeId;
   final String month; // Format: YYYY-MM
   final double dailyRate;
-  final double nightRateMultiplier;
+  final double nightBonus;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -14,7 +14,7 @@ class MonthlyRate {
     required this.employeeId,
     required this.month,
     required this.dailyRate,
-    this.nightRateMultiplier = 1.5,
+    this.nightBonus = 0.0,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : id = id ?? const Uuid().v4(),
@@ -28,7 +28,7 @@ class MonthlyRate {
       'employeeId': employeeId,
       'month': month,
       'dailyRate': dailyRate,
-      'nightRateMultiplier': nightRateMultiplier,
+      'nightBonus': nightBonus,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -41,7 +41,7 @@ class MonthlyRate {
       employeeId: map['employeeId'] as String,
       month: map['month'] as String,
       dailyRate: (map['dailyRate'] as num).toDouble(),
-      nightRateMultiplier: (map['nightRateMultiplier'] as num).toDouble(),
+      nightBonus: (map['nightBonus'] as num).toDouble(),
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
@@ -53,7 +53,7 @@ class MonthlyRate {
     String? employeeId,
     String? month,
     double? dailyRate,
-    double? nightRateMultiplier,
+    double? nightBonus,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -62,7 +62,7 @@ class MonthlyRate {
       employeeId: employeeId ?? this.employeeId,
       month: month ?? this.month,
       dailyRate: dailyRate ?? this.dailyRate,
-      nightRateMultiplier: nightRateMultiplier ?? this.nightRateMultiplier,
+      nightBonus: nightBonus ?? this.nightBonus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -79,12 +79,9 @@ class MonthlyRate {
     return null;
   }
 
-  String? validateNightRateMultiplier() {
-    if (nightRateMultiplier < 1.0) {
-      return 'Lỗi: Hệ số làm đêm không được nhỏ hơn 1.0';
-    }
-    if (nightRateMultiplier > 3.0) {
-      return 'Lỗi: Hệ số làm đêm không được quá 3.0';
+  String? validateNightBonus() {
+    if (nightBonus < 0) {
+      return 'Lỗi: Tiền thưởng làm tối không được âm';
     }
     return null;
   }
@@ -93,12 +90,12 @@ class MonthlyRate {
   Map<String, String?> validate() {
     return {
       'dailyRate': validateDailyRate(),
-      'nightRateMultiplier': validateNightRateMultiplier(),
+      'nightBonus': validateNightBonus(),
     };
   }
 
-  // Calculate night rate
-  double get nightRate => dailyRate * nightRateMultiplier;
+  // Calculate night rate (total for a day with night work)
+  double get totalWithNight => dailyRate + nightBonus;
 
   // Format month for display
   String get monthDisplay {

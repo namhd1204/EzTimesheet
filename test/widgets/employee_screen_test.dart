@@ -19,7 +19,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     employeeRepository = getIt<EmployeeRepository>();

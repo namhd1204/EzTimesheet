@@ -18,7 +18,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     attendanceRepository = getIt<AttendanceRepository>();
@@ -48,14 +48,14 @@ void main() {
       final record = AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       final created = await attendanceRepository.create(record);
 
       expect(created.id, isNotEmpty);
       expect(created.employeeId, employee.id);
-      expect(created.attendanceType, AttendanceType.fullDay);
+      expect(created.workStatus, WorkStatus.fullDay);
     });
 
     test('should get attendance record by id', () async {
@@ -65,7 +65,7 @@ void main() {
       final record = AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       );
 
       final created = await attendanceRepository.create(record);
@@ -73,7 +73,7 @@ void main() {
 
       expect(retrieved, isNotNull);
       expect(retrieved!.id, created.id);
-      expect(retrieved.attendanceType, AttendanceType.halfDay);
+      expect(retrieved.workStatus, WorkStatus.halfDay);
     });
 
     test('should get all attendance records', () async {
@@ -82,13 +82,13 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       final records = await attendanceRepository.getAll();
@@ -103,19 +103,19 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee1.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee1.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee2.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       final employee1Records = await attendanceRepository.getByEmployeeId(employee1.id);
@@ -131,13 +131,13 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       final records = await attendanceRepository.getByDate(date);
@@ -154,19 +154,19 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 10),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 20),
-        attendanceType: AttendanceType.nightWork,
+        workStatus: WorkStatus.none,
       ));
 
       final startDate = DateTime(2024, 4, 12);
@@ -185,14 +185,14 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       final record = await attendanceRepository.getByEmployeeAndDate(employee.id, date);
 
       expect(record, isNotNull);
       expect(record!.employeeId, employee.id);
-      expect(record.attendanceType, AttendanceType.fullDay);
+      expect(record.workStatus, WorkStatus.fullDay);
     });
 
     test('should return null when attendance not found by employee and date', () async {
@@ -211,17 +211,17 @@ void main() {
       final record = AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       final created = await attendanceRepository.create(record);
       final updated = await attendanceRepository.update(
         created.copyWith(
-          attendanceType: AttendanceType.halfDay,
+          workStatus: WorkStatus.halfDay,
         ),
       );
 
-      expect(updated.attendanceType, AttendanceType.halfDay);
+      expect(updated.workStatus, WorkStatus.halfDay);
     });
 
     test('should delete attendance record', () async {
@@ -231,7 +231,7 @@ void main() {
       final record = AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       final created = await attendanceRepository.create(record);
@@ -252,7 +252,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: date,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       final existsAfter = await attendanceRepository.exists(employee.id, date);
@@ -265,34 +265,36 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 18),
-        attendanceType: AttendanceType.nightWork,
+        workStatus: WorkStatus.none,
+        hasNightShift: true,
       ));
 
-      final fullDayCount = await attendanceRepository.countByTypeForEmployee(employee.id, AttendanceType.fullDay);
-      final halfDayCount = await attendanceRepository.countByTypeForEmployee(employee.id, AttendanceType.halfDay);
-      final nightWorkCount = await attendanceRepository.countByTypeForEmployee(employee.id, AttendanceType.nightWork);
+      final startDate = DateTime(2024, 4, 1);
+      final endDate = DateTime(2024, 4, 30);
+      final counts = await attendanceRepository.countByTypeForEmployee(employee.id, startDate, endDate);
 
-      expect(fullDayCount, 2);
-      expect(halfDayCount, 1);
-      expect(nightWorkCount, 1);
+      expect(counts['fullDay'], 2);
+      expect(counts['halfDay'], 1);
+      expect(counts['none'], 1);
+      expect(counts['nightShift'], 1);
     });
 
     test('should get attendance records for multiple employees and date range', () async {
@@ -302,19 +304,19 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee1.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee1.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee2.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       final startDate = DateTime(2024, 4, 14);
@@ -338,9 +340,13 @@ void main() {
     test('should return 0 when counting attendance by type with no data', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
 
-      final count = await attendanceRepository.countByTypeForEmployee(employee.id, AttendanceType.fullDay);
+      final counts = await attendanceRepository.countByTypeForEmployee(
+        employee.id,
+        DateTime(2024, 4, 1),
+        DateTime(2024, 4, 30),
+      );
 
-      expect(count, 0);
+      expect(counts['fullDay'], 0);
     });
   });
 }

@@ -18,7 +18,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     monthlyRateRepository = getIt<MonthlyRateRepository>();
@@ -181,12 +181,12 @@ void main() {
       final updated = await monthlyRateRepository.update(
         created.copyWith(
           dailyRate: 600000,
-          nightRateMultiplier: 2.0,
+          nightBonus: 2.0,
         ),
       );
 
       expect(updated.dailyRate, 600000);
-      expect(updated.nightRateMultiplier, 2.0);
+      expect(updated.nightBonus, 2.0);
     });
 
     test('should delete monthly rate', () async {

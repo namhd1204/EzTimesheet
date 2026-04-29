@@ -125,4 +125,19 @@ class MonthlyRateRepositoryImpl implements MonthlyRateRepository {
     final rate = await getByEmployeeAndMonth(employeeId, month);
     return rate != null;
   }
+
+  @override
+  Future<MonthlyRate?> getLatestRate(String employeeId) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'monthly_rates',
+      where: 'employeeId = ?',
+      whereArgs: [employeeId],
+      orderBy: 'month DESC, createdAt DESC',
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return MonthlyRate.fromMap(maps.first);
+  }
 }

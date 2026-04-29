@@ -21,7 +21,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     employeeRepository = getIt<EmployeeRepository>();
@@ -122,7 +122,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -166,7 +166,7 @@ void main() {
 
     testWidgets('should save rate configuration', (WidgetTester tester) async {
       // Create test employee
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
 
       // Build the widget
       await tester.pumpWidget(const MaterialApp(home: PayrollScreen()));
@@ -227,7 +227,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -253,7 +253,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -302,13 +302,13 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee1.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee2.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget

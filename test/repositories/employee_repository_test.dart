@@ -17,7 +17,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     employeeRepository = getIt<EmployeeRepository>();
@@ -77,8 +77,8 @@ void main() {
     });
 
     test('should get only active employees', () async {
-      final active1 = await employeeRepository.create(Employee(name: 'Active 1', phone: '0123456789'));
-      final active2 = await employeeRepository.create(Employee(name: 'Active 2', phone: '0987654321'));
+      await employeeRepository.create(Employee(name: 'Active 1', phone: '0123456789'));
+      await employeeRepository.create(Employee(name: 'Active 2', phone: '0987654321'));
       final inactive = await employeeRepository.create(Employee(name: 'Inactive', phone: '0111222333'));
 
       await employeeRepository.update(inactive.copyWith(isActive: false));

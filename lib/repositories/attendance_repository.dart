@@ -5,8 +5,18 @@ abstract class AttendanceRepository {
   /// Get all attendance records
   Future<List<AttendanceRecord>> getAll();
 
+  /// Get attendance record by ID
+  Future<AttendanceRecord?> getById(String id);
+
   /// Get attendance records by employee ID
   Future<List<AttendanceRecord>> getByEmployeeId(String employeeId);
+
+  /// Get attendance records by employee and date range
+  Future<List<AttendanceRecord>> getByEmployeeAndDateRange(
+    String employeeId,
+    DateTime startDate,
+    DateTime endDate,
+  );
 
   /// Get attendance records by date
   Future<List<AttendanceRecord>> getByDate(DateTime date);

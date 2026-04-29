@@ -1,28 +1,14 @@
-# TODOs
+# TODOs (EzTimesheet Alignment)
 
-## Priority P2
+## Priority P0: Core Alignment
+- [x] **Align Data Models** (.scratch/align-models/): Update `AttendanceRecord` and `MonthlyRate` to match `CONTEXT.md`.
+- [x] **3-Tab Navigation** (.scratch/nav-refactor/): Refactor main navigation and move settings to AppBar.
+- [x] **Redesign Attendance UI** (.scratch/attendance-ui/): Implement 3-button toggle UI with co-existence logic.
 
-### Add battery check before critical operations
+## Priority P1: Features & Reliability
+- [x] **Payroll & Rate Carry-over** (.scratch/payroll-logic/): Fix salary calculation and auto-populate month rates.
+- [x] **Data Locking** (.scratch/data-locking/): Implement month locking and confirmation dialog for unlocking.
+- [x] **Auto Backup on Launch** (.scratch/backup-sync/): Daily Google Drive sync and "Restore" button on empty state.
 
-**What:** Check device battery level before data export/import operations and warn user if battery < 20%.
-
-**Why:** Prevent data loss or corruption if device dies during critical file operations.
-
-**Pros:** Protects user data, improves reliability, prevents frustrating data loss scenarios.
-
-**Cons:** Adds small complexity to export/import flows, requires battery API integration.
-
-**Context:** Current plan handles storage failures and network errors, but doesn't account for device power loss during file operations. This is a gap identified in the CEO review Section 4 (Data Flow & Interaction Edge Cases).
-
-**Effort estimate:** S (human team) → S (with CC+gstack)
-
-**Priority:** P2
-
-**Depends on / blocked by:** None
-
-**Implementation notes:**
-- Integrate with Flutter's `battery` package
-- Add check before `BackupService#export` and `BackupService#import`
-- Show warning dialog: "Cảnh báo: Pin yếu (<20%). Nên sạc pin trước khi xuất/nhập dữ liệu."
-- Allow user to proceed with warning (don't block operation)
-- Log battery level when check is performed
+## Priority P2: Quality of Life
+- [ ] **Battery Check** (Existing): Check battery level before export/import operations.

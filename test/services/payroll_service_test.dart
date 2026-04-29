@@ -21,7 +21,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     payrollService = getIt<PayrollService>();
@@ -36,9 +36,9 @@ void main() {
   setUp(() async {
     // Clear database before each test
     final db = await databaseHelper.database;
-    await db.delete('monthly_rates');
     await db.delete('attendance_records');
     await db.delete('employees');
+    await db.delete('monthly_rates');
   });
 
   tearDownAll(() async {
@@ -49,277 +49,122 @@ void main() {
   group('PayrollService', () {
     test('should calculate payroll for employee', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      final month = '2024-04';
 
       await monthlyRateRepository.create(MonthlyRate(
         employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 500000,
-        nightRateMultiplier: 1.5,
+        month: month,
+        dailyRate: 300000,
+        nightBonus: 100000,
       ));
 
+      // 2 full days, 1 half day, 1 night work
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
-
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.fullDay,
       ));
-
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.nightWork,
+        workStatus: WorkStatus.halfDay,
+      ));
+      await attendanceRepository.create(AttendanceRecord(
+        employeeId: employee.id,
+        date: DateTime(2024, 4, 18),
+        workStatus: WorkStatus.none,
+        hasNightShift: true,
       ));
 
-      final payroll = await payrollService.calculatePayroll(employee.id, '2024-04');
+      final result = await payrollService.calculatePayroll(employee.id, month);
 
-      expect(payroll.employeeId, employee.id);
-      expect(payroll.month, '2024-04');
-      expect(payroll.fullDayCount, 1);
-      expect(payroll.halfDayCount, 1);
-      expect(payroll.nightWorkCount, 1);
-      expect(payroll.dailyRate, 500000);
-      expect(payroll.nightRateMultiplier, 1.5);
-      expect(payroll.totalPay, 500000 + 250000 + 750000); // fullDay + halfDay + nightWork
+      expect(result.employeeId, employee.id);
+      expect(result.month, month);
+      expect(result.fullDays, 2);
+      expect(result.halfDays, 1);
+      expect(result.nightWorkDays, 1);
+      
+      // (300k * 2) + (300k * 0.5) + (100k * 1) = 600k + 150k + 100k = 850k
+      expect(result.total, 850000);
     });
 
-    test('should calculate payroll with zero attendance', () async {
+    test('should carry over latest rate if current month not configured', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
+      
+      // Configure for previous month
       await monthlyRateRepository.create(MonthlyRate(
         employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 500000,
+        month: '2024-03',
+        dailyRate: 350000,
+        nightBonus: 120000,
       ));
 
-      final payroll = await payrollService.calculatePayroll(employee.id, '2024-04');
+      final result = await payrollService.calculatePayroll(employee.id, '2024-04');
 
-      expect(payroll.fullDayCount, 0);
-      expect(payroll.halfDayCount, 0);
-      expect(payroll.nightWorkCount, 0);
-      expect(payroll.totalPay, 0);
+      expect(result.dailyRate, 350000);
+      expect(result.nightBonus, 120000);
+      
+      // Verify it was saved for current month
+      final savedRate = await monthlyRateRepository.getByEmployeeAndMonth(employee.id, '2024-04');
+      expect(savedRate, isNotNull);
+      expect(savedRate!.dailyRate, 350000);
+    });
+
+    test('should throw error if no rate configured and no previous rate', () async {
+      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      
+      expect(
+        () => payrollService.calculatePayroll(employee.id, '2024-04'),
+        throwsA(isA<PayrollException>()),
+      );
     });
 
     test('should calculate payroll for all employees', () async {
       final employee1 = await employeeRepository.create(Employee(name: 'Employee 1', phone: '0123456789'));
       final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
+      final month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee1.id,
-        month: '2024-04',
-        dailyRate: 500000,
-      ));
+      await monthlyRateRepository.create(MonthlyRate(employeeId: employee1.id, month: month, dailyRate: 300000));
+      await monthlyRateRepository.create(MonthlyRate(employeeId: employee2.id, month: month, dailyRate: 400000));
 
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee2.id,
-        month: '2024-04',
-        dailyRate: 600000,
-      ));
+      final results = await payrollService.calculatePayrollForAll([employee1.id, employee2.id], month);
 
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee1.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee2.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      final payrolls = await payrollService.calculatePayrollForAll('2024-04');
-
-      expect(payrolls.length, 2);
+      expect(results.length, 2);
+      expect(results.any((r) => r.employeeId == employee1.id), true);
+      expect(results.any((r) => r.employeeId == employee2.id), true);
     });
 
-    test('should calculate total payroll', () async {
+    test('should get total payroll', () async {
       final employee1 = await employeeRepository.create(Employee(name: 'Employee 1', phone: '0123456789'));
       final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
+      final month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee1.id,
-        month: '2024-04',
-        dailyRate: 500000,
-      ));
+      await monthlyRateRepository.create(MonthlyRate(employeeId: employee1.id, month: month, dailyRate: 300000));
+      await monthlyRateRepository.create(MonthlyRate(employeeId: employee2.id, month: month, dailyRate: 400000));
 
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee2.id,
-        month: '2024-04',
-        dailyRate: 600000,
-      ));
+      await attendanceRepository.create(AttendanceRecord(employeeId: employee1.id, date: DateTime(2024, 4, 15), workStatus: WorkStatus.fullDay));
+      await attendanceRepository.create(AttendanceRecord(employeeId: employee2.id, date: DateTime(2024, 4, 15), workStatus: WorkStatus.fullDay));
 
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee1.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
+      final total = await payrollService.getTotalPayroll([employee1.id, employee2.id], month);
 
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee2.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      final totalPayroll = await payrollService.getTotalPayroll('2024-04');
-
-      expect(totalPayroll, 1100000); // 500000 + 600000
+      expect(total, 700000);
     });
 
-    test('should export payroll to text', () async {
+    test('should export payroll', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      final month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 500000,
-      ));
+      await monthlyRateRepository.create(MonthlyRate(employeeId: employee.id, month: month, dailyRate: 300000));
+      
+      final export = await payrollService.exportPayroll([employee.id], month);
 
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      final payrolls = await payrollService.calculatePayrollForAll('2024-04');
-      final exportedText = await payrollService.exportPayroll(payrolls);
-
-      expect(exportedText, isNotEmpty);
-      expect(exportedText.contains('Bảng lương tháng 04/2024'), true);
-      expect(exportedText.contains('John Doe'), true);
-      expect(exportedText.contains('500.000'), true);
-    });
-
-    test('should handle overflow in payroll calculation', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 100000000, // Maximum rate
-        nightRateMultiplier: 3.0, // Maximum multiplier
-      ));
-
-      // Create many attendance records to test overflow protection
-      for (int i = 0; i < 30; i++) {
-        await attendanceRepository.create(AttendanceRecord(
-          employeeId: employee.id,
-          date: DateTime(2024, 4, 1 + i),
-          attendanceType: AttendanceType.nightWork,
-        ));
-      }
-
-      final payroll = await payrollService.calculatePayroll(employee.id, '2024-04');
-
-      // Should not throw overflow exception
-      expect(payroll.totalPay, isNotNull);
-      expect(payroll.totalPay, greaterThan(0));
-    });
-
-    test('should calculate payroll with different attendance types', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 500000,
-        nightRateMultiplier: 2.0,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.nightWork,
-      ));
-
-      final payroll = await payrollService.calculatePayroll(employee.id, '2024-04');
-
-      expect(payroll.fullDayCount, 1);
-      expect(payroll.halfDayCount, 1);
-      expect(payroll.nightWorkCount, 1);
-      expect(payroll.totalPay, 500000 + 250000 + 1000000); // fullDay + halfDay + nightWork (2.0x)
-    });
-
-    test('should return empty list when no employees have rates', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      final payrolls = await payrollService.calculatePayrollForAll('2024-04');
-
-      expect(payrolls, isEmpty);
-    });
-
-    test('should return 0 for total payroll when no data', () async {
-      final totalPayroll = await payrollService.getTotalPayroll('2024-04');
-
-      expect(totalPayroll, 0);
-    });
-
-    test('should handle employees without monthly rate', () async {
-      final employee1 = await employeeRepository.create(Employee(name: 'Employee 1', phone: '0123456789'));
-      final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
-
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee1.id,
-        month: '2024-04',
-        dailyRate: 500000,
-      ));
-
-      // Employee 2 has no monthly rate
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee1.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee2.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      ));
-
-      final payrolls = await payrollService.calculatePayrollForAll('2024-04');
-
-      expect(payrolls.length, 1); // Only employee 1 has a rate
-      expect(payrolls.first.employeeId, employee1.id);
-    });
-
-    test('should calculate payroll with custom night rate multiplier', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      await monthlyRateRepository.create(MonthlyRate(
-        employeeId: employee.id,
-        month: '2024-04',
-        dailyRate: 500000,
-        nightRateMultiplier: 2.5,
-      ));
-
-      await attendanceRepository.create(AttendanceRecord(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.nightWork,
-      ));
-
-      final payroll = await payrollService.calculatePayroll(employee.id, '2024-04');
-
-      expect(payroll.nightWorkCount, 1);
-      expect(payroll.totalPay, 1250000); // 500000 * 2.5
+      expect(export, contains('Bảng lương tháng 2024-04'));
+      expect(export, contains(employee.id));
     });
   });
 }

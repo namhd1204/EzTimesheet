@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:eztimesheet/models/models.dart';
+import 'package:eztimesheet/utils/error_messages.dart';
 
 void main() {
   group('AttendanceRecord Model', () {
@@ -8,11 +9,11 @@ void main() {
       final record = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       expect(record.employeeId, 'employee-1');
-      expect(record.attendanceType, AttendanceType.fullDay);
+      expect(record.workStatus, WorkStatus.fullDay);
       expect(record.id, isNotEmpty);
       expect(record.createdAt, isNotNull);
       expect(record.updatedAt, isNotNull);
@@ -27,14 +28,14 @@ void main() {
         id: 'test-id',
         employeeId: 'employee-2',
         date: now,
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );
 
       expect(record.id, 'test-id');
       expect(record.employeeId, 'employee-2');
-      expect(record.attendanceType, AttendanceType.halfDay);
+      expect(record.workStatus, WorkStatus.halfDay);
       expect(record.createdAt, createdAt);
       expect(record.updatedAt, updatedAt);
     });
@@ -44,7 +45,8 @@ void main() {
       final original = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.nightWork,
+        workStatus: WorkStatus.none,
+        hasNightShift: true,
       );
 
       final map = original.toMap();
@@ -52,7 +54,8 @@ void main() {
 
       expect(restored.id, original.id);
       expect(restored.employeeId, original.employeeId);
-      expect(restored.attendanceType, original.attendanceType);
+      expect(restored.workStatus, original.workStatus);
+      expect(restored.hasNightShift, original.hasNightShift);
     });
 
     test('should copy with updated values', () {
@@ -60,15 +63,15 @@ void main() {
       final original = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       final copied = original.copyWith(
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
         updatedAt: DateTime.now(),
       );
 
-      expect(copied.attendanceType, AttendanceType.halfDay);
+      expect(copied.workStatus, WorkStatus.halfDay);
       expect(copied.employeeId, original.employeeId);
     });
 
@@ -79,7 +82,7 @@ void main() {
       final validRecord = AttendanceRecord(
         employeeId: 'employee-1',
         date: today,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       // Valid date (today or past)
@@ -89,35 +92,35 @@ void main() {
       final futureRecord = AttendanceRecord(
         employeeId: 'employee-1',
         date: future,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       expect(futureRecord.validateDate(), ErrorMessages.attendanceFutureDate);
     });
 
-    test('should get Vietnamese label for attendance type', () {
+    test('should get Vietnamese label for work status', () {
       final now = DateTime.now();
 
       final fullDay = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
-      expect(fullDay.attendanceTypeLabel, 'Cả ngày');
+      expect(fullDay.workStatusLabel, 'Cả ngày');
 
       final halfDay = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       );
-      expect(halfDay.attendanceTypeLabel, 'Nửa ngày');
+      expect(halfDay.workStatusLabel, 'Nửa ngày');
 
-      final nightWork = AttendanceRecord(
+      final none = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.nightWork,
+        workStatus: WorkStatus.none,
       );
-      expect(nightWork.attendanceTypeLabel, 'Có làm tối');
+      expect(none.workStatusLabel, 'Nghỉ');
     });
 
     test('should handle date-only storage correctly', () {
@@ -125,7 +128,7 @@ void main() {
       final record = AttendanceRecord(
         employeeId: 'employee-1',
         date: now,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       );
 
       final map = record.toMap();

@@ -19,13 +19,26 @@ class PayrollService {
   ) async {
     try {
       // Get monthly rate for employee
-      final rate = await _monthlyRateRepository.getByEmployeeAndMonth(
+      var rate = await _monthlyRateRepository.getByEmployeeAndMonth(
         employeeId,
         month,
       );
 
       if (rate == null) {
-        throw PayrollException('Lỗi: Chưa cấu hình tỷ lệ cho nhân viên này trong tháng $month');
+        // Carry-over logic: Get most recent previous rate
+        final latestRate = await _monthlyRateRepository.getLatestRate(employeeId);
+        if (latestRate != null) {
+          // Create new rate for this month based on latest
+          rate = MonthlyRate(
+            employeeId: employeeId,
+            month: month,
+            dailyRate: latestRate.dailyRate,
+            nightBonus: latestRate.nightBonus,
+          );
+          await _monthlyRateRepository.create(rate);
+        } else {
+          throw PayrollException('Lỗi: Chưa cấu hình lương cho nhân viên này trong tháng $month và không có dữ liệu cũ để kế thừa.');
+        }
       }
 
       // Parse month to get date range
@@ -51,7 +64,7 @@ class PayrollService {
       // Calculate payroll with overflow protection
       double fullDayTotal = _safeMultiply(rate.dailyRate, fullDays);
       double halfDayTotal = _safeMultiply(rate.dailyRate / 2, halfDays);
-      double nightWorkTotal = _safeMultiply(rate.nightRate, nightWorkDays);
+      double nightWorkTotal = _safeMultiply(rate.nightBonus, nightWorkDays);
 
       double total = fullDayTotal + halfDayTotal + nightWorkTotal;
 
@@ -64,7 +77,7 @@ class PayrollService {
         employeeId: employeeId,
         month: month,
         dailyRate: rate.dailyRate,
-        nightRate: rate.nightRate,
+        nightBonus: rate.nightBonus,
         fullDays: fullDays,
         halfDays: halfDays,
         nightWorkDays: nightWorkDays,
@@ -125,10 +138,10 @@ class PayrollService {
     for (final result in results) {
       buffer.writeln('Nhân viên ID: ${result.employeeId}');
       buffer.writeln('  Tỷ lệ ngày: ${_formatCurrency(result.dailyRate)}');
-      buffer.writeln('  Tỷ lệ làm đêm: ${_formatCurrency(result.nightRate)}');
+      buffer.writeln('  Tiền thưởng làm tối: ${_formatCurrency(result.nightBonus)}');
       buffer.writeln('  Số ngày làm việc: ${result.fullDays}');
       buffer.writeln('  Số nửa ngày: ${result.halfDays}');
-      buffer.writeln('  Số ngày làm đêm: ${result.nightWorkDays}');
+      buffer.writeln('  Số ngày làm tối: ${result.nightWorkDays}');
       buffer.writeln('  Tổng lương: ${_formatCurrency(result.total)}');
       buffer.writeln();
     }
@@ -173,7 +186,7 @@ class PayrollResult {
   final String employeeId;
   final String month;
   final double dailyRate;
-  final double nightRate;
+  final double nightBonus;
   final int fullDays;
   final int halfDays;
   final int nightWorkDays;
@@ -186,7 +199,7 @@ class PayrollResult {
     required this.employeeId,
     required this.month,
     required this.dailyRate,
-    required this.nightRate,
+    required this.nightBonus,
     required this.fullDays,
     required this.halfDays,
     required this.nightWorkDays,

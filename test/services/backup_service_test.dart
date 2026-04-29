@@ -21,7 +21,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     backupService = getIt<BackupService>();
@@ -54,7 +54,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await monthlyRateRepository.create(MonthlyRate(
@@ -264,7 +264,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await monthlyRateRepository.create(MonthlyRate(
@@ -310,7 +310,7 @@ void main() {
         await attendanceRepository.create(AttendanceRecord(
           employeeId: employee.id,
           date: DateTime(2024, 4, 15 + i),
-          attendanceType: AttendanceType.fullDay,
+          workStatus: WorkStatus.fullDay,
         ));
 
         await monthlyRateRepository.create(MonthlyRate(

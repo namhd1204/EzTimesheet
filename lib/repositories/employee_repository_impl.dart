@@ -1,4 +1,5 @@
 import '../database/database_helper.dart';
+import 'package:sqflite/utils/utils.dart';
 import '../models/models.dart';
 import 'employee_repository.dart';
 
@@ -105,6 +106,6 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       'SELECT COUNT(*) as count FROM employees WHERE isActive = ?',
       [1],
     );
-    return Sqflite.firstIntValue(result) ?? 0;
+    return firstIntValue(result) ?? 0;
   }
 }

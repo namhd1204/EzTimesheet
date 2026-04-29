@@ -15,9 +15,10 @@ class AttendanceService {
   /// Returns the created attendance record
   Future<AttendanceRecord> recordAttendance(
     String employeeId,
-    DateTime date,
-    AttendanceType type,
-  ) async {
+    DateTime date, {
+    WorkStatus workStatus = WorkStatus.none,
+    bool hasNightShift = false,
+  }) async {
     try {
       // Validate employee exists
       final employee = await _employeeRepository.getById(employeeId);
@@ -34,23 +35,28 @@ class AttendanceService {
         throw AttendanceException('Lỗi: Không thể ghi nhận chấm công cho ngày tương lai');
       }
 
-      // Check for duplicate attendance
+      // Check for existing attendance
       final existing = await _attendanceRepository.getByEmployeeAndDate(
         employeeId,
         attendanceDate,
       );
 
       if (existing != null) {
-        throw AttendanceException(
-          'Lỗi: Đã có bản ghi chấm công cho nhân viên này vào ngày này',
+        // Update existing record
+        final updated = existing.copyWith(
+          workStatus: workStatus,
+          hasNightShift: hasNightShift,
+          updatedAt: DateTime.now(),
         );
+        return await _attendanceRepository.update(updated);
       }
 
-      // Create attendance record
+      // Create new attendance record
       final record = AttendanceRecord(
         employeeId: employeeId,
         date: attendanceDate,
-        attendanceType: type,
+        workStatus: workStatus,
+        hasNightShift: hasNightShift,
       );
 
       return await _attendanceRepository.create(record);
@@ -60,22 +66,35 @@ class AttendanceService {
     }
   }
 
-  /// Update attendance record
+  /// Update attendance status
   /// Returns the updated attendance record
-  Future<AttendanceRecord> updateAttendance(
-    String recordId,
-    AttendanceType newType,
-  ) async {
+  Future<AttendanceRecord> updateAttendanceStatus(
+    String employeeId,
+    DateTime date, {
+    WorkStatus? workStatus,
+    bool? hasNightShift,
+  }) async {
     try {
-      // Get existing record
-      final existing = await _attendanceRepository.getById(recordId);
+      final attendanceDate = DateTime(date.year, date.month, date.day);
+      final existing = await _attendanceRepository.getByEmployeeAndDate(
+        employeeId,
+        attendanceDate,
+      );
+
       if (existing == null) {
-        throw AttendanceException('Lỗi: Không tìm thấy bản ghi chấm công');
+        // If it doesn't exist, create a new one with the provided values
+        return await recordAttendance(
+          employeeId,
+          attendanceDate,
+          workStatus: workStatus ?? WorkStatus.none,
+          hasNightShift: hasNightShift ?? false,
+        );
       }
 
       // Update record
       final updated = existing.copyWith(
-        attendanceType: newType,
+        workStatus: workStatus ?? existing.workStatus,
+        hasNightShift: hasNightShift ?? existing.hasNightShift,
         updatedAt: DateTime.now(),
       );
 

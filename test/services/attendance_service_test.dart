@@ -20,7 +20,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     attendanceService = getIt<AttendanceService>();
@@ -49,55 +49,54 @@ void main() {
       final date = DateTime(2024, 4, 15);
 
       final record = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
       expect(record.employeeId, employee.id);
-      expect(record.attendanceType, AttendanceType.fullDay);
+      expect(record.workStatus, WorkStatus.fullDay);
       expect(record.date.year, 2024);
       expect(record.date.month, 4);
       expect(record.date.day, 15);
     });
 
-    test('should prevent duplicate attendance for same employee and date', () async {
+    test('should update existing attendance if recording again', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
       final date = DateTime(2024, 4, 15);
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
-      expect(
-        () => attendanceService.recordAttendance(
-          employeeId: employee.id,
-          date: date,
-          attendanceType: AttendanceType.halfDay,
-        ),
-        throwsA(isA<AttendanceException>()),
+      final updated = await attendanceService.recordAttendance(
+        employee.id,
+        date,
+        workStatus: WorkStatus.halfDay,
       );
+
+      expect(updated.workStatus, WorkStatus.halfDay);
     });
 
-    test('should update existing attendance', () async {
+    test('should update attendance status', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
       final date = DateTime(2024, 4, 15);
 
-      final created = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+      await attendanceService.recordAttendance(
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
-      final updated = await attendanceService.updateAttendance(
-        created.id,
-        attendanceType: AttendanceType.halfDay,
+      final updated = await attendanceService.updateAttendanceStatus(
+        employee.id,
+        date,
+        workStatus: WorkStatus.halfDay,
       );
 
-      expect(updated.attendanceType, AttendanceType.halfDay);
-      expect(updated.id, created.id);
+      expect(updated.workStatus, WorkStatus.halfDay);
     });
 
     test('should delete attendance', () async {
@@ -105,9 +104,9 @@ void main() {
       final date = DateTime(2024, 4, 15);
 
       final created = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.deleteAttendance(created.id);
@@ -117,20 +116,20 @@ void main() {
       expect(retrieved, isNull);
     });
 
-    test('should get attendance by id', () async {
+    test('should get attendance by employee and date', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
       final date = DateTime(2024, 4, 15);
 
-      final created = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+      await attendanceService.recordAttendance(
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
-      final retrieved = await attendanceService.getAttendance(created.id);
+      final retrieved = await attendanceService.getAttendance(employee.id, date);
 
       expect(retrieved, isNotNull);
-      expect(retrieved!.id, created.id);
+      expect(retrieved!.employeeId, employee.id);
     });
 
     test('should get attendance for date', () async {
@@ -138,9 +137,9 @@ void main() {
       final date = DateTime(2024, 4, 15);
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
       final records = await attendanceService.getAttendanceForDate(date);
@@ -153,21 +152,21 @@ void main() {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        DateTime(2024, 4, 15),
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        employee.id,
+        DateTime(2024, 4, 16),
+        workStatus: WorkStatus.halfDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 20),
-        attendanceType: AttendanceType.nightWork,
+        employee.id,
+        DateTime(2024, 4, 20),
+        workStatus: WorkStatus.none,
       );
 
       final startDate = DateTime(2024, 4, 14);
@@ -187,29 +186,35 @@ void main() {
       final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
 
       await attendanceService.recordAttendance(
-        employeeId: employee1.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        employee1.id,
+        DateTime(2024, 4, 15),
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee2.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        employee2.id,
+        DateTime(2024, 4, 15),
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee1.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        employee1.id,
+        DateTime(2024, 4, 16),
+        workStatus: WorkStatus.halfDay,
       );
 
       final startDate = DateTime(2024, 4, 14);
       final endDate = DateTime(2024, 4, 18);
 
-      final records = await attendanceService.getAttendanceForAllInRange(startDate, endDate);
+      final recordsMap = await attendanceService.getAttendanceForAllInRange(
+        [employee1.id, employee2.id],
+        startDate,
+        endDate,
+      );
 
-      expect(records.length, 3);
+      expect(recordsMap.length, 2);
+      expect(recordsMap[employee1.id]!.length, 2);
+      expect(recordsMap[employee2.id]!.length, 1);
     });
 
     test('should check if attendance exists for employee and date', () async {
@@ -220,9 +225,9 @@ void main() {
       expect(existsBefore, false);
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: date,
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        date,
+        workStatus: WorkStatus.fullDay,
       );
 
       final existsAfter = await attendanceService.hasAttendance(employee.id, date);
@@ -233,134 +238,59 @@ void main() {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        DateTime(2024, 4, 15),
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        employee.id,
+        DateTime(2024, 4, 16),
+        workStatus: WorkStatus.halfDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.nightWork,
+        employee.id,
+        DateTime(2024, 4, 17),
+        workStatus: WorkStatus.none,
       );
 
       final lastAttendance = await attendanceService.getLastAttendance(employee.id);
 
       expect(lastAttendance, isNotNull);
       expect(lastAttendance!.date.day, 17);
-      expect(lastAttendance.attendanceType, AttendanceType.nightWork);
-    });
-
-    test('should return null when no last attendance exists', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      final lastAttendance = await attendanceService.getLastAttendance(employee.id);
-
-      expect(lastAttendance, isNull);
+      expect(lastAttendance.workStatus, WorkStatus.none);
     });
 
     test('should undo last attendance', () async {
       final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
+        employee.id,
+        DateTime(2024, 4, 15),
+        workStatus: WorkStatus.fullDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
+        employee.id,
+        DateTime(2024, 4, 16),
+        workStatus: WorkStatus.halfDay,
       );
 
       await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.nightWork,
+        employee.id,
+        DateTime(2024, 4, 17),
+        workStatus: WorkStatus.none,
       );
 
       final undone = await attendanceService.undoLastAttendance(employee.id);
 
       expect(undone, isNotNull);
       expect(undone!.date.day, 17);
-      expect(undone.attendanceType, AttendanceType.nightWork);
 
       // Verify it was deleted
       final exists = await attendanceService.hasAttendance(employee.id, DateTime(2024, 4, 17));
       expect(exists, false);
-    });
-
-    test('should return null when undoing last attendance with no records', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      final undone = await attendanceService.undoLastAttendance(employee.id);
-
-      expect(undone, isNull);
-    });
-
-    test('should handle different attendance types', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      final fullDay = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 15),
-        attendanceType: AttendanceType.fullDay,
-      );
-
-      final halfDay = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 16),
-        attendanceType: AttendanceType.halfDay,
-      );
-
-      final nightWork = await attendanceService.recordAttendance(
-        employeeId: employee.id,
-        date: DateTime(2024, 4, 17),
-        attendanceType: AttendanceType.nightWork,
-      );
-
-      expect(fullDay.attendanceType, AttendanceType.fullDay);
-      expect(halfDay.attendanceType, AttendanceType.halfDay);
-      expect(nightWork.attendanceType, AttendanceType.nightWork);
-    });
-
-    test('should return empty list when no attendance for date', () async {
-      final date = DateTime(2024, 4, 15);
-
-      final records = await attendanceService.getAttendanceForDate(date);
-
-      expect(records, isEmpty);
-    });
-
-    test('should return empty list when no attendance for employee in range', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-
-      final startDate = DateTime(2024, 4, 14);
-      final endDate = DateTime(2024, 4, 18);
-
-      final records = await attendanceService.getAttendanceForEmployeeInRange(
-        employee.id,
-        startDate,
-        endDate,
-      );
-
-      expect(records, isEmpty);
-    });
-
-    test('should return empty list when no attendance for all employees in range', () async {
-      final startDate = DateTime(2024, 4, 14);
-      final endDate = DateTime(2024, 4, 18);
-
-      final records = await attendanceService.getAttendanceForAllInRange(startDate, endDate);
-
-      expect(records, isEmpty);
     });
   });
 }

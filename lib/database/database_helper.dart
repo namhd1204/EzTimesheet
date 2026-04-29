@@ -1,8 +1,20 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_migration/sqflite_migration.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+class Migration {
+  final int id;
+  final Future<void> Function(Database db) up;
+  final Future<void> Function(Database db)? down;
+
+  Migration({
+    required this.id,
+    required this.up,
+    this.down,
+  });
+}
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -19,8 +31,14 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    final String dbPath = join(appDocumentsDir.path, 'eztimesheet.db');
+    String dbPath;
+    
+    if (kIsWeb) {
+      dbPath = 'eztimesheet_v2.db';
+    } else {
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      dbPath = join(appDocumentsDir.path, 'eztimesheet.db');
+    }
 
     // Define migrations
     final migrations = [
@@ -46,7 +64,7 @@ class DatabaseHelper {
               id TEXT PRIMARY KEY,
               employeeId TEXT NOT NULL,
               date TEXT NOT NULL,
-              attendanceType TEXT NOT NULL,
+              attendanceType TEXT, -- Phụ thuộc model cũ, để NULL để tương thích
               createdAt TEXT NOT NULL,
               updatedAt TEXT NOT NULL,
               FOREIGN KEY (employeeId) REFERENCES employees (id) ON DELETE CASCADE
@@ -82,26 +100,56 @@ class DatabaseHelper {
           await db.execute('DROP TABLE IF EXISTS employees');
         },
       ),
+      // Migration 2: Update models for coexistence and fixed night bonus
+      Migration(
+        id: 2,
+        up: (Database db) async {
+          // Add new columns to attendance_records
+          await db.execute('ALTER TABLE attendance_records ADD COLUMN workStatus TEXT NOT NULL DEFAULT "none"');
+          await db.execute('ALTER TABLE attendance_records ADD COLUMN hasNightShift INTEGER NOT NULL DEFAULT 0');
+
+          // Add new column to monthly_rates
+          await db.execute('ALTER TABLE monthly_rates ADD COLUMN nightBonus REAL NOT NULL DEFAULT 0.0');
+          
+          // Note: SQLite doesn't support dropping columns easily. 
+          // attendanceType and nightRateMultiplier will remain in the schema but unused.
+        },
+      ),
+      // Migration 3: Add month_locks table
+      Migration(
+        id: 3,
+        up: (Database db) async {
+          await db.execute('''
+            CREATE TABLE month_locks (
+              month TEXT PRIMARY KEY,
+              isLocked INTEGER NOT NULL DEFAULT 0,
+              updatedAt TEXT NOT NULL
+            )
+          ''');
+        },
+      ),
     ];
 
     // Open database with migrations
-    return openDatabase(
+    return databaseFactory.openDatabase(
       dbPath,
-      version: 1,
-      onCreate: (Database db, int version) async {
-        // Run all migrations
-        for (final migration in migrations) {
-          await migration.up(db);
-        }
-      },
-      onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        // Run migrations for each version
-        for (final migration in migrations) {
-          if (migration.id > oldVersion && migration.id <= newVersion) {
+      options: OpenDatabaseOptions(
+        version: 3,
+        onCreate: (Database db, int version) async {
+          // Run all migrations
+          for (final migration in migrations) {
             await migration.up(db);
           }
-        }
-      },
+        },
+        onUpgrade: (Database db, int oldVersion, int newVersion) async {
+          // Run migrations for each version
+          for (final migration in migrations) {
+            if (migration.id > oldVersion && migration.id <= newVersion) {
+              await migration.up(db);
+            }
+          }
+        },
+      ),
     );
   }
 

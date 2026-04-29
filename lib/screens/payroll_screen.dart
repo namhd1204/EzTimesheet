@@ -1,10 +1,15 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
 import '../utils/utils.dart';
+import '../services/services.dart';
+import '../repositories/repositories.dart';
+import 'settings_screen.dart';
 
 class PayrollScreen extends StatefulWidget {
   const PayrollScreen({super.key});
@@ -17,6 +22,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
   final MonthlyRateRepository _monthlyRateRepository = getIt<MonthlyRateRepository>();
   final PayrollService _payrollService = getIt<PayrollService>();
+  final MonthLockRepository _monthLockRepository = getIt<MonthLockRepository>();
 
   DateTime _currentMonth = DateTime.now();
   List<Employee> _employees = [];
@@ -24,6 +30,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
   Map<String, PayrollResult?> _payrollResults = {};
   bool _isLoading = true;
   bool _isCalculating = false;
+  bool _isLocked = false;
   String? _errorMessage;
 
   @override
@@ -53,9 +60,13 @@ class _PayrollScreenState extends State<PayrollScreen> {
         rates[employee.id] = rate;
       }
 
+      // Load lock status
+      final isLocked = await _monthLockRepository.isLocked(monthString);
+
       setState(() {
         _employees = employees;
         _rates = rates;
+        _isLocked = isLocked;
         _isLoading = false;
       });
     } catch (e) {
@@ -117,6 +128,28 @@ class _PayrollScreenState extends State<PayrollScreen> {
   }
 
   Future<void> _configureRate(Employee employee) async {
+    if (_isLocked) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Dữ liệu đã chốt'),
+          content: const Text('Tháng này đã được chốt. Bạn có chắc muốn thay đổi cấu hình lương không?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Đồng ý', style: TextStyle(color: AppTheme.error)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    if (!mounted) return;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => RateConfigurationDialog(
@@ -128,6 +161,59 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
     if (result == true) {
       _loadData();
+    }
+  }
+
+  Future<void> _toggleLock() async {
+    final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
+    final monthDisplay = DateFormatters.formatMonth(_currentMonth);
+    
+    if (!_isLocked) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Chốt dữ liệu $monthDisplay'),
+          content: Text('Sau khi chốt, dữ liệu chấm công và lương của tháng $monthDisplay sẽ được bảo vệ. Bạn có chắc chắn?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Chốt dữ liệu', style: TextStyle(color: AppTheme.primary)),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed == true) {
+        await _monthLockRepository.setLock(monthString, true);
+        _loadData();
+      }
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Mở khóa dữ liệu $monthDisplay'),
+          content: Text('Bạn đang mở khóa dữ liệu đã chốt. Bạn có chắc chắn muốn cho phép sửa đổi dữ liệu tháng này?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Mở khóa', style: TextStyle(color: AppTheme.error)),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed == true) {
+        await _monthLockRepository.setLock(monthString, false);
+        _loadData();
+      }
     }
   }
 
@@ -146,8 +232,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã sao chép bảng lương vào clipboard'),
+          SnackBar(
+            content: const Text('Đã sao chép bảng lương vào clipboard'),
             action: SnackBarAction(
               label: 'OK',
               onPressed: () {},
@@ -171,6 +257,12 @@ class _PayrollScreenState extends State<PayrollScreen> {
         title: Text(DateFormatters.formatMonth(_currentMonth)),
         actions: [
           IconButton(
+            icon: Icon(_isLocked ? Icons.lock : Icons.lock_open),
+            onPressed: _toggleLock,
+            tooltip: _isLocked ? 'Mở khóa tháng' : 'Chốt tháng',
+            color: _isLocked ? AppTheme.primary : null,
+          ),
+          IconButton(
             icon: const Icon(Icons.today),
             onPressed: _goToToday,
             tooltip: 'Hôm nay',
@@ -179,6 +271,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
             icon: const Icon(Icons.file_download),
             onPressed: _exportPayroll,
             tooltip: 'Xuất bảng lương',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            ),
+            tooltip: 'Cài đặt',
           ),
         ],
       ),
@@ -353,10 +453,15 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   backgroundColor: AppTheme.primary,
                   child: employee.photoPath != null
                       ? ClipOval(
-                          child: Image.file(
-                            File(employee.photoPath!),
-                            fit: BoxFit.cover,
-                          ),
+                          child: kIsWeb
+                              ? Image.network(
+                                  employee.photoPath!,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  File(employee.photoPath!),
+                                  fit: BoxFit.cover,
+                                ),
                         )
                       : Text(
                           employee.name[0].toUpperCase(),
@@ -365,7 +470,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                           ),
                         ),
                 ),
-                const SizedBox(width: AppTheme.space3),
+                SizedBox(width: AppTheme.space3),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +510,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     return OutlinedButton.icon(
       onPressed: () => _configureRate(employee),
       icon: const Icon(Icons.settings),
-      label: const Text('Cấu hình tỷ lệ'),
+      label: const Text('Tiền công 1 ngày'),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 48),
       ),
@@ -430,7 +535,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 style: AppTheme.bodyMedium,
               ),
               Text(
-                'Tỷ lệ làm đêm: ${CurrencyFormatters.formatVND(rate.nightRate)}',
+                'Thưởng làm tối: ${CurrencyFormatters.formatVND(rate.nightBonus)}',
                 style: AppTheme.bodySmall.copyWith(
                   color: AppTheme.textSecondary,
                 ),
@@ -453,7 +558,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     return Container(
       padding: AppTheme.paddingSmall,
       decoration: BoxDecoration(
-        color: AppTheme.primaryLight.withOpacity(0.3),
+        color: AppTheme.primaryLight.withValues(alpha: 0.3),
         borderRadius: AppTheme.borderRadiusSmall,
         border: Border.all(color: AppTheme.primary),
       ),
@@ -534,7 +639,7 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _dailyRateController;
-  late TextEditingController _nightRateMultiplierController;
+  late TextEditingController _nightBonusController;
   bool _isSaving = false;
   String? _errorMessage;
 
@@ -544,8 +649,8 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
     _dailyRateController = TextEditingController(
       text: widget.existingRate?.dailyRate.toString() ?? '',
     );
-    _nightRateMultiplierController = TextEditingController(
-      text: widget.existingRate?.nightRateMultiplier.toString() ?? '1.5',
+    _nightBonusController = TextEditingController(
+      text: widget.existingRate?.nightBonus.toString() ?? '0',
     );
   }
 
@@ -561,9 +666,9 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
 
     try {
       final dailyRate = double.tryParse(_dailyRateController.text);
-      final nightRateMultiplier = double.tryParse(_nightRateMultiplierController.text);
+      final nightBonus = double.tryParse(_nightBonusController.text);
 
-      if (dailyRate == null || nightRateMultiplier == null) {
+      if (dailyRate == null || nightBonus == null) {
         setState(() {
           _errorMessage = 'Lỗi: Giá trị không hợp lệ';
           _isSaving = false;
@@ -577,7 +682,7 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
         // Update existing rate
         final updated = widget.existingRate!.copyWith(
           dailyRate: dailyRate,
-          nightRateMultiplier: nightRateMultiplier,
+          nightBonus: nightBonus,
           updatedAt: DateTime.now(),
         );
         await _monthlyRateRepository.update(updated);
@@ -587,7 +692,7 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
           employeeId: widget.employee.id,
           month: monthString,
           dailyRate: dailyRate,
-          nightRateMultiplier: nightRateMultiplier,
+          nightBonus: nightBonus,
         );
         await _monthlyRateRepository.create(rate);
       }
@@ -606,14 +711,14 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
   @override
   void dispose() {
     _dailyRateController.dispose();
-    _nightRateMultiplierController.dispose();
+    _nightBonusController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Cấu hình tỷ lệ - ${widget.employee.name}'),
+      title: Text('Tiền công 1 ngày - ${widget.employee.name}'),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -654,25 +759,26 @@ class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
               ),
               const SizedBox(height: AppTheme.space3),
 
-              // Night rate multiplier field
+              // Night bonus field
               TextFormField(
-                controller: _nightRateMultiplierController,
+                controller: _nightBonusController,
                 decoration: const InputDecoration(
-                  labelText: 'Hệ số làm đêm',
-                  hintText: 'Nhập hệ số làm đêm',
+                  labelText: 'Thưởng làm tối (VND)',
+                  hintText: 'Nhập tiền thưởng làm tối',
                   border: OutlineInputBorder(),
+                  suffixText: '₫',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Lỗi: Vui lòng nhập hệ số làm đêm';
+                    return 'Lỗi: Vui lòng nhập tiền thưởng làm tối';
                   }
-                  final multiplier = double.tryParse(value);
-                  if (multiplier == null) {
+                  final bonus = double.tryParse(value);
+                  if (bonus == null) {
                     return 'Lỗi: Giá trị không hợp lệ';
                   }
-                  if (!ValidationUtils.isValidNightRateMultiplier(multiplier)) {
-                    return 'Lỗi: Hệ số phải từ 1.0 đến 3.0';
+                  if (bonus < 0) {
+                    return 'Lỗi: Tiền thưởng không được âm';
                   }
                   return null;
                 },

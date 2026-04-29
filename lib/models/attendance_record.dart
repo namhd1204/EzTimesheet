@@ -1,16 +1,17 @@
 import 'package:uuid/uuid.dart';
 
-enum AttendanceType {
+enum WorkStatus {
+  none,
   fullDay,
   halfDay,
-  nightWork,
 }
 
 class AttendanceRecord {
   final String id;
   final String employeeId;
   final DateTime date;
-  final AttendanceType attendanceType;
+  final WorkStatus workStatus;
+  final bool hasNightShift;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -18,7 +19,8 @@ class AttendanceRecord {
     String? id,
     required this.employeeId,
     required this.date,
-    required this.attendanceType,
+    this.workStatus = WorkStatus.none,
+    this.hasNightShift = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : id = id ?? const Uuid().v4(),
@@ -31,7 +33,8 @@ class AttendanceRecord {
       'id': id,
       'employeeId': employeeId,
       'date': _dateToIso8601String(date),
-      'attendanceType': attendanceType.name,
+      'workStatus': workStatus.name,
+      'hasNightShift': hasNightShift ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -43,10 +46,11 @@ class AttendanceRecord {
       id: map['id'] as String,
       employeeId: map['employeeId'] as String,
       date: _parseIso8601Date(map['date'] as String),
-      attendanceType: AttendanceType.values.firstWhere(
-        (type) => type.name == map['attendanceType'],
-        orElse: () => AttendanceType.fullDay,
+      workStatus: WorkStatus.values.firstWhere(
+        (type) => type.name == map['workStatus'],
+        orElse: () => WorkStatus.none,
       ),
+      hasNightShift: (map['hasNightShift'] as int?) == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
@@ -57,7 +61,8 @@ class AttendanceRecord {
     String? id,
     String? employeeId,
     DateTime? date,
-    AttendanceType? attendanceType,
+    WorkStatus? workStatus,
+    bool? hasNightShift,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -65,7 +70,8 @@ class AttendanceRecord {
       id: id ?? this.id,
       employeeId: employeeId ?? this.employeeId,
       date: date ?? this.date,
-      attendanceType: attendanceType ?? this.attendanceType,
+      workStatus: workStatus ?? this.workStatus,
+      hasNightShift: hasNightShift ?? this.hasNightShift,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -98,14 +104,14 @@ class AttendanceRecord {
   }
 
   // Get Vietnamese label for attendance type
-  String get attendanceTypeLabel {
-    switch (attendanceType) {
-      case AttendanceType.fullDay:
+  String get workStatusLabel {
+    switch (workStatus) {
+      case WorkStatus.fullDay:
         return 'Cả ngày';
-      case AttendanceType.halfDay:
+      case WorkStatus.halfDay:
         return 'Nửa ngày';
-      case AttendanceType.nightWork:
-        return 'Có làm tối';
+      case WorkStatus.none:
+        return 'Nghỉ';
     }
   }
 }

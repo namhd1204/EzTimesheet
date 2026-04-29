@@ -31,4 +31,7 @@ abstract class MonthlyRateRepository {
 
   /// Check if rate exists for employee and month
   Future<bool> exists(String employeeId, String month);
+
+  /// Get latest monthly rate for employee (any month)
+  Future<MonthlyRate?> getLatestRate(String employeeId);
 }

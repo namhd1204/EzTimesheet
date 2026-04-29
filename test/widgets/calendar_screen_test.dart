@@ -20,7 +20,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
 
     // Setup service locator
-    await ServiceLocator.setup();
+    await setupServiceLocator();
 
     databaseHelper = getIt<DatabaseHelper>();
     employeeRepository = getIt<EmployeeRepository>();
@@ -114,7 +114,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: today,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -135,7 +135,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: today,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -163,7 +163,7 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: today,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       // Build the widget
@@ -233,13 +233,13 @@ void main() {
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: today,
-        attendanceType: AttendanceType.fullDay,
+        workStatus: WorkStatus.fullDay,
       ));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
         date: yesterday,
-        attendanceType: AttendanceType.halfDay,
+        workStatus: WorkStatus.halfDay,
       ));
 
       // Build the widget

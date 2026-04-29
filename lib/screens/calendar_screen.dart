@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
 import '../utils/utils.dart';
+import '../repositories/repositories.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -256,7 +258,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildDayCell(int day, DateTime date, List<AttendanceRecord> attendance) {
     final isToday = DateFormatters.isToday(date);
-    final isPast = DateFormatters.isPast(date);
 
     return GestureDetector(
       onTap: () => _showDayDetails(date),
@@ -361,10 +362,15 @@ class DayAttendanceDialog extends StatelessWidget {
                 backgroundColor: AppTheme.primary,
                 child: employee.photoPath != null
                     ? ClipOval(
-                        child: Image.file(
-                          File(employee.photoPath!),
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb
+                            ? Image.network(
+                                employee.photoPath!,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.file(
+                                File(employee.photoPath!),
+                                fit: BoxFit.cover,
+                              ),
                       )
                     : Text(
                         employee.name[0].toUpperCase(),
@@ -374,8 +380,8 @@ class DayAttendanceDialog extends StatelessWidget {
                       ),
               ),
               title: Text(employee.name),
-              subtitle: Text(record.attendanceTypeLabel),
-              trailing: _buildAttendanceTypeIcon(record.attendanceType),
+              subtitle: Text(record.workStatusLabel + (record.hasNightShift ? ' + Làm tối' : '')),
+              trailing: _buildWorkStatusIcon(record.workStatus),
             );
           },
         ),
@@ -389,22 +395,22 @@ class DayAttendanceDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildAttendanceTypeIcon(AttendanceType type) {
+  Widget _buildWorkStatusIcon(WorkStatus type) {
     IconData icon;
     Color color;
 
     switch (type) {
-      case AttendanceType.fullDay:
+      case WorkStatus.fullDay:
         icon = Icons.check_circle;
         color = Colors.green;
         break;
-      case AttendanceType.halfDay:
+      case WorkStatus.halfDay:
         icon = Icons.adjust;
         color = Colors.orange;
         break;
-      case AttendanceType.nightWork:
-        icon = Icons.nights_stay;
-        color = Colors.purple;
+      case WorkStatus.none:
+        icon = Icons.circle_outlined;
+        color = Colors.grey;
         break;
     }
 
