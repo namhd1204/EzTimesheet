@@ -1,0 +1,715 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../design_system/app_theme.dart';
+import '../di/service_locator.dart';
+import '../models/models.dart';
+import '../utils/utils.dart';
+
+class PayrollScreen extends StatefulWidget {
+  const PayrollScreen({super.key});
+
+  @override
+  State<PayrollScreen> createState() => _PayrollScreenState();
+}
+
+class _PayrollScreenState extends State<PayrollScreen> {
+  final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
+  final MonthlyRateRepository _monthlyRateRepository = getIt<MonthlyRateRepository>();
+  final PayrollService _payrollService = getIt<PayrollService>();
+
+  DateTime _currentMonth = DateTime.now();
+  List<Employee> _employees = [];
+  Map<String, MonthlyRate?> _rates = {};
+  Map<String, PayrollResult?> _payrollResults = {};
+  bool _isLoading = true;
+  bool _isCalculating = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Load employees
+      final employees = await _employeeRepository.getAllActive();
+      final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
+
+      // Load rates for current month
+      final rates = <String, MonthlyRate?>{};
+      for (final employee in employees) {
+        final rate = await _monthlyRateRepository.getByEmployeeAndMonth(
+          employee.id,
+          monthString,
+        );
+        rates[employee.id] = rate;
+      }
+
+      setState(() {
+        _employees = employees;
+        _rates = rates;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = ErrorMessages.generalError;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _previousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+    _loadData();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+    _loadData();
+  }
+
+  void _goToToday() {
+    setState(() {
+      _currentMonth = DateTime.now();
+    });
+    _loadData();
+  }
+
+  Future<void> _calculatePayroll() async {
+    setState(() {
+      _isCalculating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
+      final employeeIds = _employees.map((e) => e.id).toList();
+
+      final results = await _payrollService.calculatePayrollForAll(
+        employeeIds,
+        monthString,
+      );
+
+      setState(() {
+        _payrollResults = {
+          for (final result in results) result.employeeId: result
+        };
+        _isCalculating = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = ErrorMessages.payrollCalculationFailed;
+        _isCalculating = false;
+      });
+    }
+  }
+
+  Future<void> _configureRate(Employee employee) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => RateConfigurationDialog(
+        employee: employee,
+        month: _currentMonth,
+        existingRate: _rates[employee.id],
+      ),
+    );
+
+    if (result == true) {
+      _loadData();
+    }
+  }
+
+  Future<void> _exportPayroll() async {
+    try {
+      final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
+      final employeeIds = _employees.map((e) => e.id).toList();
+
+      final payrollText = await _payrollService.exportPayroll(
+        employeeIds,
+        monthString,
+      );
+
+      // Copy to clipboard
+      await Clipboard.setData(ClipboardData(text: payrollText));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã sao chép bảng lương vào clipboard'),
+            action: SnackBarAction(
+              label: 'OK',
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorMessages.generalError)),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(DateFormatters.formatMonth(_currentMonth)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.today),
+            onPressed: _goToToday,
+            tooltip: 'Hôm nay',
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            onPressed: _exportPayroll,
+            tooltip: 'Xuất bảng lương',
+          ),
+        ],
+      ),
+      body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isCalculating ? null : _calculatePayroll,
+        child: _isCalculating
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Icon(Icons.calculate),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+            const SizedBox(height: AppTheme.space4),
+            Text(
+              _errorMessage!,
+              style: AppTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppTheme.space4),
+            ElevatedButton(
+              onPressed: _loadData,
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_employees.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: AppTheme.textTertiary,
+            ),
+            const SizedBox(height: AppTheme.space4),
+            Text(
+              'Chưa có nhân viên nào',
+              style: AppTheme.bodyLarge.copyWith(
+                color: AppTheme.textTertiary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Month navigation
+        _buildMonthNavigation(),
+        const Divider(),
+
+        // Payroll summary
+        if (_payrollResults.isNotEmpty) _buildPayrollSummary(),
+
+        // Employee list
+        Expanded(
+          child: _buildEmployeeList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthNavigation() {
+    return Padding(
+      padding: AppTheme.paddingMedium,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _previousMonth,
+            tooltip: 'Tháng trước',
+          ),
+          Text(
+            DateFormatters.getMonthName(_currentMonth.month),
+            style: AppTheme.headlineMedium,
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _nextMonth,
+            tooltip: 'Tháng sau',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPayrollSummary() {
+    final total = _payrollResults.values.fold<double>(
+      0,
+      (sum, result) => sum + (result?.total ?? 0),
+    );
+
+    return Container(
+      padding: AppTheme.paddingMedium,
+      color: AppTheme.primaryLight,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Tổng lương:',
+            style: AppTheme.bodyLarge.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            CurrencyFormatters.formatVND(total),
+            style: AppTheme.headlineMedium.copyWith(
+              color: AppTheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmployeeList() {
+    return ListView.builder(
+      padding: AppTheme.paddingMedium,
+      itemCount: _employees.length,
+      itemBuilder: (context, index) {
+        final employee = _employees[index];
+        final rate = _rates[employee.id];
+        final payrollResult = _payrollResults[employee.id];
+
+        return _buildEmployeeCard(employee, rate, payrollResult);
+      },
+    );
+  }
+
+  Widget _buildEmployeeCard(
+    Employee employee,
+    MonthlyRate? rate,
+    PayrollResult? payrollResult,
+  ) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppTheme.space3),
+      child: Padding(
+        padding: AppTheme.paddingMedium,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Employee info
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppTheme.primary,
+                  child: employee.photoPath != null
+                      ? ClipOval(
+                          child: Image.file(
+                            File(employee.photoPath!),
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Text(
+                          employee.name[0].toUpperCase(),
+                          style: AppTheme.headlineSmall.copyWith(
+                            color: AppTheme.textInverse,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        employee.name,
+                        style: AppTheme.bodyLarge,
+                      ),
+                      if (employee.phone.isNotEmpty)
+                        Text(
+                          employee.phone,
+                          style: AppTheme.bodySmall.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.space3),
+
+            // Rate configuration or payroll result
+            if (rate == null)
+              _buildConfigureRateButton(employee)
+            else if (payrollResult != null)
+              _buildPayrollResult(payrollResult)
+            else
+              _buildRateInfo(rate),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfigureRateButton(Employee employee) {
+    return OutlinedButton.icon(
+      onPressed: () => _configureRate(employee),
+      icon: const Icon(Icons.settings),
+      label: const Text('Cấu hình tỷ lệ'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 48),
+      ),
+    );
+  }
+
+  Widget _buildRateInfo(MonthlyRate rate) {
+    return Container(
+      padding: AppTheme.paddingSmall,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceElevated,
+        borderRadius: AppTheme.borderRadiusSmall,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tỷ lệ ngày: ${CurrencyFormatters.formatVND(rate.dailyRate)}',
+                style: AppTheme.bodyMedium,
+              ),
+              Text(
+                'Tỷ lệ làm đêm: ${CurrencyFormatters.formatVND(rate.nightRate)}',
+                style: AppTheme.bodySmall.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _configureRate(
+              _employees.firstWhere((e) => e.id == rate.employeeId),
+            ),
+            tooltip: 'Sửa',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPayrollResult(PayrollResult result) {
+    return Container(
+      padding: AppTheme.paddingSmall,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryLight.withOpacity(0.3),
+        borderRadius: AppTheme.borderRadiusSmall,
+        border: Border.all(color: AppTheme.primary),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Tổng lương:',
+                style: AppTheme.bodyMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                CurrencyFormatters.formatVND(result.total),
+                style: AppTheme.headlineSmall.copyWith(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space2),
+          _buildPayrollDetailRow('Ngày làm việc:', result.fullDays),
+          _buildPayrollDetailRow('Nửa ngày:', result.halfDays),
+          _buildPayrollDetailRow('Làm đêm:', result.nightWorkDays),
+          const SizedBox(height: AppTheme.space2),
+          _buildPayrollDetailRow('Tiền ngày:', result.fullDayTotal),
+          _buildPayrollDetailRow('Tiền nửa ngày:', result.halfDayTotal),
+          _buildPayrollDetailRow('Tiền làm đêm:', result.nightWorkTotal),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPayrollDetailRow(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTheme.bodySmall.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          Text(
+            value is int ? '$value' : CurrencyFormatters.formatVND(value as double),
+            style: AppTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class RateConfigurationDialog extends StatefulWidget {
+  final Employee employee;
+  final DateTime month;
+  final MonthlyRate? existingRate;
+
+  const RateConfigurationDialog({
+    super.key,
+    required this.employee,
+    required this.month,
+    this.existingRate,
+  });
+
+  @override
+  State<RateConfigurationDialog> createState() => _RateConfigurationDialogState();
+}
+
+class _RateConfigurationDialogState extends State<RateConfigurationDialog> {
+  final MonthlyRateRepository _monthlyRateRepository = getIt<MonthlyRateRepository>();
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _dailyRateController;
+  late TextEditingController _nightRateMultiplierController;
+  bool _isSaving = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _dailyRateController = TextEditingController(
+      text: widget.existingRate?.dailyRate.toString() ?? '',
+    );
+    _nightRateMultiplierController = TextEditingController(
+      text: widget.existingRate?.nightRateMultiplier.toString() ?? '1.5',
+    );
+  }
+
+  Future<void> _saveRate() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final dailyRate = double.tryParse(_dailyRateController.text);
+      final nightRateMultiplier = double.tryParse(_nightRateMultiplierController.text);
+
+      if (dailyRate == null || nightRateMultiplier == null) {
+        setState(() {
+          _errorMessage = 'Lỗi: Giá trị không hợp lệ';
+          _isSaving = false;
+        });
+        return;
+      }
+
+      final monthString = DateFormatters.formatMonthForStorage(widget.month);
+
+      if (widget.existingRate != null) {
+        // Update existing rate
+        final updated = widget.existingRate!.copyWith(
+          dailyRate: dailyRate,
+          nightRateMultiplier: nightRateMultiplier,
+          updatedAt: DateTime.now(),
+        );
+        await _monthlyRateRepository.update(updated);
+      } else {
+        // Create new rate
+        final rate = MonthlyRate(
+          employeeId: widget.employee.id,
+          month: monthString,
+          dailyRate: dailyRate,
+          nightRateMultiplier: nightRateMultiplier,
+        );
+        await _monthlyRateRepository.create(rate);
+      }
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = ErrorMessages.generalError;
+        _isSaving = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _dailyRateController.dispose();
+    _nightRateMultiplierController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Cấu hình tỷ lệ - ${widget.employee.name}'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormatters.formatMonth(widget.month),
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppTheme.space4),
+
+              // Daily rate field
+              TextFormField(
+                controller: _dailyRateController,
+                decoration: const InputDecoration(
+                  labelText: 'Tỷ lệ ngày (VND)',
+                  hintText: 'Nhập tỷ lệ ngày',
+                  border: OutlineInputBorder(),
+                  suffixText: '₫',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Lỗi: Vui lòng nhập tỷ lệ ngày';
+                  }
+                  final rate = double.tryParse(value);
+                  if (rate == null) {
+                    return 'Lỗi: Giá trị không hợp lệ';
+                  }
+                  if (!ValidationUtils.isValidDailyRate(rate)) {
+                    return 'Lỗi: Tỷ lệ phải từ 0 đến 100,000,000';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppTheme.space3),
+
+              // Night rate multiplier field
+              TextFormField(
+                controller: _nightRateMultiplierController,
+                decoration: const InputDecoration(
+                  labelText: 'Hệ số làm đêm',
+                  hintText: 'Nhập hệ số làm đêm',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Lỗi: Vui lòng nhập hệ số làm đêm';
+                  }
+                  final multiplier = double.tryParse(value);
+                  if (multiplier == null) {
+                    return 'Lỗi: Giá trị không hợp lệ';
+                  }
+                  if (!ValidationUtils.isValidNightRateMultiplier(multiplier)) {
+                    return 'Lỗi: Hệ số phải từ 1.0 đến 3.0';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppTheme.space3),
+
+              // Error message
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.space2),
+                  child: Text(
+                    _errorMessage!,
+                    style: AppTheme.labelSmall.copyWith(
+                      color: AppTheme.error,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _saveRate,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
+  }
+}
