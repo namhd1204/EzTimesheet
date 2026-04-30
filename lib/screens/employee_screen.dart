@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
@@ -104,17 +105,38 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     }
   }
 
+  Future<void> _callEmployee(String phone) async {
+    if (phone.isEmpty) return;
+    
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phone,
+    );
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Đang gọi số $phone (giả lập trên web/dev)')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đang gọi số $phone (giả lập trên web/dev)')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nhân viên'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddEmployeeDialog,
-            tooltip: 'Thêm nhân viên',
-          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.push(
@@ -126,6 +148,11 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         ],
       ),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddEmployeeDialog,
+        tooltip: 'Thêm nhân viên',
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
@@ -224,6 +251,13 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (employee.phone.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.phone),
+                    onPressed: () => _callEmployee(employee.phone),
+                    tooltip: 'Gọi điện',
+                    color: AppTheme.primaryLight,
+                  ),
                 IconButton(
                   icon: const Icon(Icons.visibility),
                   onPressed: () => _showEmployeeDetails(employee),
