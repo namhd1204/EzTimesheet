@@ -49,7 +49,8 @@ void main() {
   group('BackupService', () {
     test('should export data to JSON', () async {
       // Create test data
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
@@ -84,7 +85,7 @@ void main() {
 
     test('should import data from JSON', () async {
       // Create test JSON data
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [
     {
@@ -134,7 +135,7 @@ void main() {
     });
 
     test('should import empty JSON', () async {
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [],
   "attendance_records": [],
@@ -153,7 +154,7 @@ void main() {
     });
 
     test('should handle invalid JSON format', () async {
-      final jsonData = 'invalid json';
+      const jsonData = 'invalid json';
 
       expect(
         () => backupService.importData(jsonData),
@@ -162,7 +163,7 @@ void main() {
     });
 
     test('should handle missing required fields in JSON', () async {
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [
     {
@@ -187,7 +188,7 @@ void main() {
         phone: '0123456789',
       ));
 
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [
     {
@@ -212,7 +213,7 @@ void main() {
     });
 
     test('should handle invalid attendance record during import', () async {
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [],
   "attendance_records": [
@@ -235,7 +236,7 @@ void main() {
     });
 
     test('should handle invalid monthly rate during import', () async {
-      final jsonData = '''
+      const jsonData = '''
 {
   "employees": [],
   "attendance_records": [],
@@ -259,7 +260,8 @@ void main() {
 
     test('should export and import data correctly', () async {
       // Create test data
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
 
       await attendanceRepository.create(AttendanceRecord(
         employeeId: employee.id,
@@ -305,7 +307,8 @@ void main() {
     test('should handle large dataset during export', () async {
       // Create multiple employees
       for (int i = 0; i < 10; i++) {
-        final employee = await employeeRepository.create(Employee(name: 'Employee $i', phone: '0123456789'));
+        final employee = await employeeRepository
+            .create(Employee(name: 'Employee $i', phone: '0123456789'));
 
         await attendanceRepository.create(AttendanceRecord(
           employeeId: employee.id,

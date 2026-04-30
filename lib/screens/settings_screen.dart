@@ -194,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Lỗi'),
-            content: Text(ErrorMessages.dataExportFailed),
+            content: const Text(ErrorMessages.dataExportFailed),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -279,7 +279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Lỗi'),
-            content: Text(ErrorMessages.dataImportFailed),
+            content: const Text(ErrorMessages.dataImportFailed),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -421,9 +421,12 @@ class ImportSummaryDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSummarySection('Nhân viên', summary.employeesImported, summary.employeesFailed),
-            _buildSummarySection('Bản ghi chấm công', summary.attendanceImported, summary.attendanceFailed),
-            _buildSummarySection('Tỷ lệ lương', summary.ratesImported, summary.ratesFailed),
+            _buildSummarySection('Nhân viên', summary.employeesImported,
+                summary.employeesFailed),
+            _buildSummarySection('Bản ghi chấm công',
+                summary.attendanceImported, summary.attendanceFailed),
+            _buildSummarySection(
+                'Tỷ lệ lương', summary.ratesImported, summary.ratesFailed),
             const SizedBox(height: AppTheme.space3),
             if (summary.hasFailures)
               Text(

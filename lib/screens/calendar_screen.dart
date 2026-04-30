@@ -16,7 +16,8 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
-  final AttendanceRepository _attendanceRepository = getIt<AttendanceRepository>();
+  final AttendanceRepository _attendanceRepository =
+      getIt<AttendanceRepository>();
 
   DateTime _currentMonth = DateTime.now();
   List<Employee> _employees = [];
@@ -45,7 +46,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final startDate = DateFormatters.firstDayOfMonth(_currentMonth);
       final endDate = DateFormatters.lastDayOfMonth(_currentMonth);
 
-      final attendanceData = await _attendanceRepository.getByEmployeesAndDateRange(
+      final attendanceData =
+          await _attendanceRepository.getByEmployeesAndDateRange(
         employeeIds,
         startDate,
         endDate,
@@ -170,7 +172,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.people_outline,
               size: 64,
               color: AppTheme.textTertiary,
@@ -256,7 +258,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildDayCell(int day, DateTime date, List<AttendanceRecord> attendance) {
+  Widget _buildDayCell(
+      int day, DateTime date, List<AttendanceRecord> attendance) {
     final isToday = DateFormatters.isToday(date);
 
     return GestureDetector(
@@ -380,7 +383,8 @@ class DayAttendanceDialog extends StatelessWidget {
                       ),
               ),
               title: Text(employee.name),
-              subtitle: Text(record.workStatusLabel + (record.hasNightShift ? ' + Làm tối' : '')),
+              subtitle: Text(record.workStatusLabel +
+                  (record.hasNightShift ? ' + Làm tối' : '')),
               trailing: _buildWorkStatusIcon(record.workStatus),
             );
           },

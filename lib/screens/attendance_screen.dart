@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
@@ -20,15 +19,13 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
-  final AttendanceRepository _attendanceRepository =
-      getIt<AttendanceRepository>();
   final AttendanceService _attendanceService = getIt<AttendanceService>();
-  final MonthLockRepository _monthLockRepository = getIt<MonthLockRepository>();
   final BackupService _backupService = getIt<BackupService>();
 
   DateTime _selectedDate = DateTime.now();
   List<Employee> _employees = [];
   Map<String, AttendanceRecord?> _attendanceMap = {};
+  bool _isMonthLocked = false;
   bool _isLoading = true;
   bool _isRestoring = false;
   String? _errorMessage;
@@ -46,22 +43,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     try {
-      // Load employees
       final employees = await _employeeRepository.getAllActive();
+      final employeeIds = employees.map((e) => e.id).toList();
 
-      // Load attendance for selected date
-      final attendanceMap = <String, AttendanceRecord?>{};
-      for (final employee in employees) {
-        final attendance = await _attendanceRepository.getByEmployeeAndDate(
-          employee.id,
-          _selectedDate,
-        );
-        attendanceMap[employee.id] = attendance;
-      }
+      // Single call: batch attendance + lock check (replaces N+1 + separate lock query)
+      final dayView = await _attendanceService.getAttendanceDayView(
+        employeeIds,
+        _selectedDate,
+      );
 
       setState(() {
         _employees = employees;
-        _attendanceMap = attendanceMap;
+        _attendanceMap = dayView.attendanceMap;
+        _isMonthLocked = dayView.isMonthLocked;
         _isLoading = false;
       });
     } catch (e, stack) {
@@ -176,7 +170,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.people_outline,
               size: 64,
               color: AppTheme.textTertiary,
@@ -393,10 +387,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<bool> _checkLock() async {
-    final month = DateFormatters.formatMonthForStorage(_selectedDate);
-    final isLocked = await _monthLockRepository.isLocked(month);
-
-    if (isLocked) {
+    if (_isMonthLocked) {
       if (!mounted) return false;
       final confirmed = await showDialog<bool>(
         context: context,

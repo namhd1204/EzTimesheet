@@ -48,8 +48,9 @@ void main() {
 
   group('PayrollService', () {
     test('should calculate payroll for employee', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-      final month = '2024-04';
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
+      const month = '2024-04';
 
       await monthlyRateRepository.create(MonthlyRate(
         employeeId: employee.id,
@@ -88,14 +89,16 @@ void main() {
       expect(result.fullDays, 2);
       expect(result.halfDays, 1);
       expect(result.nightWorkDays, 1);
-      
+
       // (300k * 2) + (300k * 0.5) + (100k * 1) = 600k + 150k + 100k = 850k
       expect(result.total, 850000);
     });
 
-    test('should carry over latest rate if current month not configured', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-      
+    test('should carry over latest rate if current month not configured',
+        () async {
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
+
       // Configure for previous month
       await monthlyRateRepository.create(MonthlyRate(
         employeeId: employee.id,
@@ -104,20 +107,24 @@ void main() {
         nightBonus: 120000,
       ));
 
-      final result = await payrollService.calculatePayroll(employee.id, '2024-04');
+      final result =
+          await payrollService.calculatePayroll(employee.id, '2024-04');
 
       expect(result.dailyRate, 350000);
       expect(result.nightBonus, 120000);
-      
+
       // Verify it was saved for current month
-      final savedRate = await monthlyRateRepository.getByEmployeeAndMonth(employee.id, '2024-04');
+      final savedRate = await monthlyRateRepository.getByEmployeeAndMonth(
+          employee.id, '2024-04');
       expect(savedRate, isNotNull);
       expect(savedRate!.dailyRate, 350000);
     });
 
-    test('should throw error if no rate configured and no previous rate', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-      
+    test('should throw error if no rate configured and no previous rate',
+        () async {
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
+
       expect(
         () => payrollService.calculatePayroll(employee.id, '2024-04'),
         throwsA(isA<PayrollException>()),
@@ -125,14 +132,19 @@ void main() {
     });
 
     test('should calculate payroll for all employees', () async {
-      final employee1 = await employeeRepository.create(Employee(name: 'Employee 1', phone: '0123456789'));
-      final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
-      final month = '2024-04';
+      final employee1 = await employeeRepository
+          .create(Employee(name: 'Employee 1', phone: '0123456789'));
+      final employee2 = await employeeRepository
+          .create(Employee(name: 'Employee 2', phone: '0987654321'));
+      const month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(employeeId: employee1.id, month: month, dailyRate: 300000));
-      await monthlyRateRepository.create(MonthlyRate(employeeId: employee2.id, month: month, dailyRate: 400000));
+      await monthlyRateRepository.create(MonthlyRate(
+          employeeId: employee1.id, month: month, dailyRate: 300000));
+      await monthlyRateRepository.create(MonthlyRate(
+          employeeId: employee2.id, month: month, dailyRate: 400000));
 
-      final results = await payrollService.calculatePayrollForAll([employee1.id, employee2.id], month);
+      final results = await payrollService
+          .calculatePayrollForAll([employee1.id, employee2.id], month);
 
       expect(results.length, 2);
       expect(results.any((r) => r.employeeId == employee1.id), true);
@@ -140,27 +152,40 @@ void main() {
     });
 
     test('should get total payroll', () async {
-      final employee1 = await employeeRepository.create(Employee(name: 'Employee 1', phone: '0123456789'));
-      final employee2 = await employeeRepository.create(Employee(name: 'Employee 2', phone: '0987654321'));
-      final month = '2024-04';
+      final employee1 = await employeeRepository
+          .create(Employee(name: 'Employee 1', phone: '0123456789'));
+      final employee2 = await employeeRepository
+          .create(Employee(name: 'Employee 2', phone: '0987654321'));
+      const month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(employeeId: employee1.id, month: month, dailyRate: 300000));
-      await monthlyRateRepository.create(MonthlyRate(employeeId: employee2.id, month: month, dailyRate: 400000));
+      await monthlyRateRepository.create(MonthlyRate(
+          employeeId: employee1.id, month: month, dailyRate: 300000));
+      await monthlyRateRepository.create(MonthlyRate(
+          employeeId: employee2.id, month: month, dailyRate: 400000));
 
-      await attendanceRepository.create(AttendanceRecord(employeeId: employee1.id, date: DateTime(2024, 4, 15), workStatus: WorkStatus.fullDay));
-      await attendanceRepository.create(AttendanceRecord(employeeId: employee2.id, date: DateTime(2024, 4, 15), workStatus: WorkStatus.fullDay));
+      await attendanceRepository.create(AttendanceRecord(
+          employeeId: employee1.id,
+          date: DateTime(2024, 4, 15),
+          workStatus: WorkStatus.fullDay));
+      await attendanceRepository.create(AttendanceRecord(
+          employeeId: employee2.id,
+          date: DateTime(2024, 4, 15),
+          workStatus: WorkStatus.fullDay));
 
-      final total = await payrollService.getTotalPayroll([employee1.id, employee2.id], month);
+      final total = await payrollService
+          .getTotalPayroll([employee1.id, employee2.id], month);
 
       expect(total, 700000);
     });
 
     test('should export payroll', () async {
-      final employee = await employeeRepository.create(Employee(name: 'John Doe', phone: '0123456789'));
-      final month = '2024-04';
+      final employee = await employeeRepository
+          .create(Employee(name: 'John Doe', phone: '0123456789'));
+      const month = '2024-04';
 
-      await monthlyRateRepository.create(MonthlyRate(employeeId: employee.id, month: month, dailyRate: 300000));
-      
+      await monthlyRateRepository.create(MonthlyRate(
+          employeeId: employee.id, month: month, dailyRate: 300000));
+
       final export = await payrollService.exportPayroll([employee.id], month);
 
       expect(export, contains('Bảng lương tháng 2024-04'));

@@ -98,7 +98,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(ErrorMessages.generalError)),
+            const SnackBar(content: Text(ErrorMessages.generalError)),
           );
         }
       }
@@ -162,7 +162,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.people_outline,
               size: 64,
               color: AppTheme.textTertiary,
@@ -195,18 +195,18 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: AppTheme.primary,
-                  child: employee.photoPath != null
-                      ? ClipOval(
-                          child: kIsWeb
-                              ? Image.network(
-                                  employee.photoPath!,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.file(
-                                  File(employee.photoPath!),
-                                  fit: BoxFit.cover,
-                                ),
-                        )
+              child: employee.photoPath != null
+                  ? ClipOval(
+                      child: kIsWeb
+                          ? Image.network(
+                              employee.photoPath!,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.file(
+                              File(employee.photoPath!),
+                              fit: BoxFit.cover,
+                            ),
+                    )
                   : Text(
                       employee.name[0].toUpperCase(),
                       style: AppTheme.headlineSmall.copyWith(
@@ -231,7 +231,8 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EmployeeHistoryScreen(employee: employee),
+                        builder: (context) =>
+                            EmployeeHistoryScreen(employee: employee),
                       ),
                     );
                   },
@@ -383,7 +384,7 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.camera_alt,
                               size: 32,
                               color: AppTheme.textTertiary,

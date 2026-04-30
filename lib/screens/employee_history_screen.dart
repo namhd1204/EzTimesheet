@@ -15,8 +15,9 @@ class EmployeeHistoryScreen extends StatefulWidget {
 }
 
 class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
-  final AttendanceRepository _attendanceRepository = getIt<AttendanceRepository>();
-  
+  final AttendanceRepository _attendanceRepository =
+      getIt<AttendanceRepository>();
+
   DateTime _currentMonth = DateTime.now();
   List<AttendanceRecord> _records = [];
   Map<String, int> _counts = {};
@@ -30,7 +31,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    
+
     final startDate = DateFormatters.firstDayOfMonth(_currentMonth);
     final endDate = DateFormatters.lastDayOfMonth(_currentMonth);
 
@@ -40,7 +41,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
         startDate,
         endDate,
       );
-      
+
       final counts = await _attendanceRepository.countByTypeForEmployee(
         widget.employee.id,
         startDate,
@@ -124,8 +125,10 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildSummaryItem('Cả ngày', _counts['fullDay'] ?? 0, Colors.green),
-            _buildSummaryItem('Nửa ngày', _counts['halfDay'] ?? 0, Colors.orange),
-            _buildSummaryItem('Làm tối', _counts['nightShift'] ?? 0, Colors.blue),
+            _buildSummaryItem(
+                'Nửa ngày', _counts['halfDay'] ?? 0, Colors.orange),
+            _buildSummaryItem(
+                'Làm tối', _counts['nightShift'] ?? 0, Colors.blue),
           ],
         ),
       ),
@@ -149,7 +152,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 64, color: AppTheme.textTertiary),
+          const Icon(Icons.history, size: 64, color: AppTheme.textTertiary),
           const SizedBox(height: AppTheme.space3),
           Text(
             'Không có dữ liệu trong tháng này',
@@ -175,7 +178,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
           child: ListTile(
             leading: _buildStatusIcon(record.workStatus),
             title: Text(
-              DateFormatters.getWeekdayName(record.date) + ', ' + DateFormatters.formatDate(record.date),
+              '${DateFormatters.getWeekdayName(record.date)}, ${DateFormatters.formatDate(record.date)}',
               style: AppTheme.bodyLarge,
             ),
             trailing: record.hasNightShift

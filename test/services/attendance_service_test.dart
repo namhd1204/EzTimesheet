@@ -142,7 +142,7 @@ void main() {
         workStatus: WorkStatus.fullDay,
       );
 
-      final records = await attendanceService.getAttendanceForDate(date);
+      final records = await attendanceService.getAllRecordsForDate(date);
 
       expect(records.length, 1);
       expect(records.first.employeeId, employee.id);

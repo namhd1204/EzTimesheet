@@ -24,8 +24,8 @@ class DesignSystemShowcase extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           // App Bar
-          SliverAppBar(
-            title: const Text('Design System'),
+          const SliverAppBar(
+            title: Text('Design System'),
             floating: true,
             elevation: AppTheme.elevationNone,
           ),
@@ -281,9 +281,9 @@ class DesignSystemShowcase extends StatelessWidget {
               onPressed: () {},
               child: const Text('Elevated'),
             ),
-            ElevatedButton(
+            const ElevatedButton(
               onPressed: null,
-              child: const Text('Disabled'),
+              child: Text('Disabled'),
             ),
             TextButton(
               onPressed: () {},
