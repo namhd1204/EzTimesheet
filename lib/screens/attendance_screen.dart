@@ -7,7 +7,6 @@ import '../models/models.dart';
 import '../utils/utils.dart';
 import '../repositories/repositories.dart';
 import '../services/services.dart';
-import 'calendar_screen.dart';
 import 'settings_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -130,19 +129,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             icon: const Icon(Icons.calendar_today),
             onPressed: _showDatePicker,
             tooltip: 'Chọn ngày',
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final selectedDate = await Navigator.push<DateTime>(
-                context,
-                MaterialPageRoute(builder: (context) => const CalendarScreen()),
-              );
-              if (selectedDate != null) {
-                _selectDate(selectedDate);
-              }
-            },
-            tooltip: 'Xem lịch',
           ),
           IconButton(
             icon: const Icon(Icons.settings),
