@@ -46,22 +46,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
     });
 
     try {
-      // Load employees
       final employees = await _employeeRepository.getAllActive();
       final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
 
-      // Load rates for current month
-      final rates = <String, MonthlyRate?>{};
-      for (final employee in employees) {
-        final rate = await _monthlyRateRepository.getByEmployeeAndMonth(
-          employee.id,
-          monthString,
-        );
-        rates[employee.id] = rate;
-      }
-
-      // Load lock status
       final isLocked = await _monthLockRepository.isLocked(monthString);
+      final ratesList = await _monthlyRateRepository.getByMonth(monthString);
+      final rates = <String, MonthlyRate?>{
+        for (final r in ratesList) r.employeeId: r
+      };
 
       setState(() {
         _employees = employees;
@@ -108,15 +100,15 @@ class _PayrollScreenState extends State<PayrollScreen> {
       final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
       final employeeIds = _employees.map((e) => e.id).toList();
 
-      final results = await _payrollService.calculatePayrollForAll(
+      await _payrollService.ensureRatesForMonth(employeeIds, monthString);
+      final view = await _payrollService.getPayrollMonthView(
         employeeIds,
         monthString,
       );
 
       setState(() {
-        _payrollResults = {
-          for (final result in results) result.employeeId: result
-        };
+        _rates = view.rates; // Update rates in case carry-over generated new ones
+        _payrollResults = view.results;
         _isCalculating = false;
       });
     } catch (e) {

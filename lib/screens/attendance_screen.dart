@@ -280,42 +280,44 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final workStatus = attendance?.workStatus ?? WorkStatus.none;
     final hasNightShift = attendance?.hasNightShift ?? false;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildToggleButton(
-                label: 'Cả ngày',
-                icon: Icons.wb_sunny,
-                isActive: workStatus == WorkStatus.fullDay,
-                activeColor: Colors.green,
-                onPressed: () => _toggleWorkStatus(
-                    employee.id, attendance, WorkStatus.fullDay),
-              ),
-            ),
-            const SizedBox(width: AppTheme.space2),
-            Expanded(
-              child: _buildToggleButton(
-                label: 'Nửa ngày',
-                icon: Icons.wb_twilight,
-                isActive: workStatus == WorkStatus.halfDay,
-                activeColor: Colors.orange,
-                onPressed: () => _toggleWorkStatus(
-                    employee.id, attendance, WorkStatus.halfDay),
-              ),
-            ),
-          ],
+        Expanded(
+          flex: 2,
+          child: _buildToggleButton(
+            label: 'Cả ngày',
+            icon: Icons.wb_sunny,
+            isActive: workStatus == WorkStatus.fullDay,
+            isDimmed: workStatus == WorkStatus.halfDay,
+            activeColor: Colors.green,
+            onPressed: () => _toggleWorkStatus(
+                employee.id, attendance, WorkStatus.fullDay),
+          ),
         ),
-        const SizedBox(height: AppTheme.space2),
-        _buildToggleButton(
-          label: 'Làm tối',
-          icon: Icons.nights_stay,
-          isActive: hasNightShift,
-          activeColor: Colors.purple,
-          onPressed: () => _toggleNightShift(employee.id, attendance),
-          isFullWidth: true,
+        const SizedBox(width: AppTheme.space2),
+        Expanded(
+          flex: 2,
+          child: _buildToggleButton(
+            label: 'Nửa ngày',
+            icon: Icons.wb_twilight,
+            isActive: workStatus == WorkStatus.halfDay,
+            isDimmed: workStatus == WorkStatus.fullDay,
+            activeColor: Colors.orange,
+            onPressed: () => _toggleWorkStatus(
+                employee.id, attendance, WorkStatus.halfDay),
+          ),
+        ),
+        const SizedBox(width: AppTheme.space4),
+        Expanded(
+          flex: 2,
+          child: _buildToggleButton(
+            label: 'Làm tối',
+            icon: Icons.nights_stay,
+            isActive: hasNightShift,
+            isDimmed: false,
+            activeColor: Colors.purple,
+            onPressed: () => _toggleNightShift(employee.id, attendance),
+          ),
         ),
       ],
     );
@@ -325,34 +327,40 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     required String label,
     required IconData icon,
     required bool isActive,
+    bool isDimmed = false,
     required Color activeColor,
     required VoidCallback onPressed,
     bool isFullWidth = false,
   }) {
+    final displayColor = isDimmed ? activeColor.withValues(alpha: 0.3) : activeColor;
+    
     return SizedBox(
       height: 60, // Large button for elders
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(isActive ? Icons.check_circle : icon, size: 24),
+        icon: Icon(isActive ? Icons.check_circle : icon, size: 20),
         label: Text(
           label,
           style: AppTheme.bodyLarge.copyWith(
-            color: isActive ? Colors.white : activeColor,
+            color: isActive ? Colors.white : displayColor,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14, // reduce size to fit 3 in row
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isActive ? activeColor : Colors.transparent,
-          foregroundColor: isActive ? Colors.white : activeColor,
+          backgroundColor: isActive ? displayColor : Colors.transparent,
+          foregroundColor: isActive ? Colors.white : displayColor,
           elevation: isActive ? 4 : 0,
-          side: BorderSide(color: activeColor, width: 2),
+          side: BorderSide(color: displayColor, width: isDimmed ? 1 : 2),
           shape: RoundedRectangleBorder(
             borderRadius: AppTheme.borderRadiusMedium,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
         ).copyWith(
           overlayColor:
-              WidgetStateProperty.all(activeColor.withValues(alpha: 0.1)),
+              WidgetStateProperty.all(displayColor.withValues(alpha: 0.1)),
         ),
       ),
     );

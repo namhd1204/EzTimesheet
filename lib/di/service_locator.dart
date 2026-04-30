@@ -41,6 +41,7 @@ Future<void> setupServiceLocator() async {
     PayrollService(
       getIt<AttendanceRepository>(),
       getIt<MonthlyRateRepository>(),
+      getIt<MonthLockRepository>(),
     ),
   );
   getIt.registerSingleton<BackupService>(

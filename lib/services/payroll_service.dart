@@ -5,10 +5,12 @@ import '../repositories/repositories.dart';
 class PayrollService {
   final AttendanceRepository _attendanceRepository;
   final MonthlyRateRepository _monthlyRateRepository;
+  final MonthLockRepository _monthLockRepository;
 
   PayrollService(
     this._attendanceRepository,
     this._monthlyRateRepository,
+    this._monthLockRepository,
   );
 
   /// Calculate payroll for employee in a specific month
@@ -92,25 +94,104 @@ class PayrollService {
     }
   }
 
+  /// Ensure rates exist for all employees in a month (carry-over logic)
+  Future<void> ensureRatesForMonth(
+    List<String> employeeIds,
+    String month,
+  ) async {
+    final existingRates = await _monthlyRateRepository.getByMonth(month);
+    final existingIds = existingRates.map((r) => r.employeeId).toSet();
+
+    for (final id in employeeIds) {
+      if (!existingIds.contains(id)) {
+        final latestRate = await _monthlyRateRepository.getLatestRate(id);
+        if (latestRate != null) {
+          final rate = MonthlyRate(
+            employeeId: id,
+            month: month,
+            dailyRate: latestRate.dailyRate,
+            nightBonus: latestRate.nightBonus,
+          );
+          await _monthlyRateRepository.create(rate);
+        }
+      }
+    }
+  }
+
+  /// Batch load payroll view for the month — replaces N+1 in Screen.
+  Future<PayrollMonthView> getPayrollMonthView(
+    List<String> employeeIds,
+    String month,
+  ) async {
+    final parts = month.split('-');
+    final year = int.parse(parts[0]);
+    final monthNum = int.parse(parts[1]);
+
+    final startDate = DateTime(year, monthNum, 1);
+    final endDate = DateTime(year, monthNum + 1, 0);
+
+    // Parallel batch queries
+    final results = await Future.wait([
+      _monthLockRepository.isLocked(month),
+      _monthlyRateRepository.getByMonth(month),
+      _attendanceRepository.getByEmployeesAndDateRange(employeeIds, startDate, endDate),
+    ]);
+
+    final isLocked = results[0] as bool;
+    final rates = results[1] as List<MonthlyRate>;
+    final batchAttendance = results[2] as Map<String, List<AttendanceRecord>>;
+
+    final rateMap = {for (final r in rates) r.employeeId: r};
+    final payrollResults = <String, PayrollResult>{};
+
+    for (final id in employeeIds) {
+      final rate = rateMap[id];
+      if (rate == null) continue;
+
+      final records = batchAttendance[id] ?? [];
+      int fullDays = 0, halfDays = 0, nightWorkDays = 0;
+      
+      for (final r in records) {
+        if (r.workStatus == WorkStatus.fullDay) fullDays++;
+        else if (r.workStatus == WorkStatus.halfDay) halfDays++;
+        if (r.hasNightShift) nightWorkDays++;
+      }
+
+      double fullDayTotal = _safeMultiply(rate.dailyRate, fullDays);
+      double halfDayTotal = _safeMultiply(rate.dailyRate / 2, halfDays);
+      double nightWorkTotal = _safeMultiply(rate.nightBonus, nightWorkDays);
+      double total = fullDayTotal + halfDayTotal + nightWorkTotal;
+
+      payrollResults[id] = PayrollResult(
+        employeeId: id,
+        month: month,
+        dailyRate: rate.dailyRate,
+        nightBonus: rate.nightBonus,
+        fullDays: fullDays,
+        halfDays: halfDays,
+        nightWorkDays: nightWorkDays,
+        fullDayTotal: fullDayTotal,
+        halfDayTotal: halfDayTotal,
+        nightWorkTotal: nightWorkTotal,
+        total: total,
+      );
+    }
+
+    return PayrollMonthView(
+      isLocked: isLocked,
+      rates: rateMap,
+      results: payrollResults,
+    );
+  }
+
   /// Calculate payroll for all employees in a specific month
   /// Returns list of PayrollResult for each employee
   Future<List<PayrollResult>> calculatePayrollForAll(
     List<String> employeeIds,
     String month,
   ) async {
-    final List<PayrollResult> results = [];
-
-    for (final employeeId in employeeIds) {
-      try {
-        final result = await calculatePayroll(employeeId, month);
-        results.add(result);
-      } catch (e) {
-        // Skip employees with errors but continue with others
-        continue;
-      }
-    }
-
-    return results;
+    final view = await getPayrollMonthView(employeeIds, month);
+    return view.results.values.toList();
   }
 
   /// Get payroll summary for all employees in a specific month
@@ -211,4 +292,17 @@ class PayrollResult {
 
   /// Get total working days (full days count as 1, half days as 0.5)
   double get totalWorkingDays => fullDays + (halfDays / 2);
+}
+
+/// View state for the entire payroll screen for a month
+class PayrollMonthView {
+  final bool isLocked;
+  final Map<String, MonthlyRate> rates;
+  final Map<String, PayrollResult> results;
+
+  PayrollMonthView({
+    required this.isLocked,
+    required this.rates,
+    required this.results,
+  });
 }
