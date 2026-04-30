@@ -396,20 +396,21 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
     return Container(
       padding: AppTheme.paddingMedium,
-      color: AppTheme.primaryLight,
+      color: AppTheme.primary,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             'Tổng lương:',
             style: AppTheme.bodyLarge.copyWith(
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
             CurrencyFormatters.formatVND(total),
             style: AppTheme.headlineMedium.copyWith(
-              color: AppTheme.primary,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -556,9 +557,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
     return Container(
       padding: AppTheme.paddingSmall,
       decoration: BoxDecoration(
-        color: AppTheme.primaryLight.withValues(alpha: 0.3),
+        color: AppTheme.primaryLight.withValues(alpha: 0.15),
         borderRadius: AppTheme.borderRadiusSmall,
-        border: Border.all(color: AppTheme.primary),
+        border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,13 +570,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
               Text(
                 'Tổng lương:',
                 style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textPrimary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 CurrencyFormatters.formatVND(result.total),
                 style: AppTheme.headlineSmall.copyWith(
-                  color: AppTheme.primary,
+                  color: AppTheme.primaryLight,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -586,15 +588,15 @@ class _PayrollScreenState extends State<PayrollScreen> {
           _buildPayrollDetailRow('Nửa ngày:', result.halfDays),
           _buildPayrollDetailRow('Làm đêm:', result.nightWorkDays),
           const SizedBox(height: AppTheme.space2),
-          _buildPayrollDetailRow('Tiền ngày:', result.fullDayTotal),
-          _buildPayrollDetailRow('Tiền nửa ngày:', result.halfDayTotal),
-          _buildPayrollDetailRow('Tiền làm đêm:', result.nightWorkTotal),
+          _buildPayrollDetailRow('Tiền ngày:', result.fullDayTotal, isCurrency: true),
+          _buildPayrollDetailRow('Tiền nửa ngày:', result.halfDayTotal, isCurrency: true),
+          _buildPayrollDetailRow('Tiền làm đêm:', result.nightWorkTotal, isCurrency: true),
         ],
       ),
     );
   }
 
-  Widget _buildPayrollDetailRow(String label, dynamic value) {
+  Widget _buildPayrollDetailRow(String label, dynamic value, {bool isCurrency = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -607,9 +609,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
             ),
           ),
           Text(
-            value is int
-                ? '$value'
-                : CurrencyFormatters.formatVND(value as double),
+            isCurrency
+                ? CurrencyFormatters.formatVND((value as num).toDouble())
+                : '$value',
             style: AppTheme.bodySmall,
           ),
         ],
