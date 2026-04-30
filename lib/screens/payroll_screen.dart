@@ -19,8 +19,6 @@ class PayrollScreen extends StatefulWidget {
 
 class _PayrollScreenState extends State<PayrollScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
-  final MonthlyRateRepository _monthlyRateRepository =
-      getIt<MonthlyRateRepository>();
   final PayrollService _payrollService = getIt<PayrollService>();
   final MonthLockRepository _monthLockRepository = getIt<MonthLockRepository>();
 

@@ -15,6 +15,7 @@ void main() async {
   if (kIsWeb) {
     databaseFactory = createDatabaseFactoryFfiWeb(
       options: SqfliteFfiWebOptions(
+        // ignore: invalid_use_of_visible_for_testing_member
         forceAsBasicWorker: true,
         indexedDbName: 'eztimesheet_v2', // Đổi sang v2
       ),

@@ -152,9 +152,14 @@ class PayrollService {
       int fullDays = 0, halfDays = 0, nightWorkDays = 0;
       
       for (final r in records) {
-        if (r.workStatus == WorkStatus.fullDay) fullDays++;
-        else if (r.workStatus == WorkStatus.halfDay) halfDays++;
-        if (r.hasNightShift) nightWorkDays++;
+        if (r.workStatus == WorkStatus.fullDay) {
+          fullDays++;
+        } else if (r.workStatus == WorkStatus.halfDay) {
+          halfDays++;
+        }
+        if (r.hasNightShift) {
+          nightWorkDays++;
+        }
       }
 
       double fullDayTotal = _safeMultiply(rate.dailyRate, fullDays);

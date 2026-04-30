@@ -336,7 +336,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     bool isDimmed = false,
     required Color activeColor,
     required VoidCallback onPressed,
-    bool isFullWidth = false,
   }) {
     final displayColor = isDimmed ? activeColor.withValues(alpha: 0.3) : activeColor;
     
