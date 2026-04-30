@@ -109,7 +109,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(DateFormatters.formatDate(_selectedDate)),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left, size: 32),
+              onPressed: () => _selectDate(_selectedDate.subtract(const Duration(days: 1))),
+            ),
+            Text(DateFormatters.formatDate(_selectedDate)),
+            IconButton(
+              icon: const Icon(Icons.chevron_right, size: 32),
+              onPressed: _selectedDate.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))
+                  ? () => _selectDate(_selectedDate.add(const Duration(days: 1)))
+                  : null, // Disable if today
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
@@ -118,10 +133,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CalendarScreen()),
-            ),
+            onPressed: () async {
+              final selectedDate = await Navigator.push<DateTime>(
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarScreen()),
+              );
+              if (selectedDate != null) {
+                _selectDate(selectedDate);
+              }
+            },
             tooltip: 'Xem lịch',
           ),
           IconButton(

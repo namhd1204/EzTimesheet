@@ -256,6 +256,24 @@ class AttendanceService {
       isMonthLocked: isLocked,
     );
   }
+  /// Get full monthly history for a single employee (records + counts)
+  Future<EmployeeMonthHistory> getEmployeeMonthHistory(
+    String employeeId,
+    DateTime monthDate,
+  ) async {
+    final startDate = DateFormatters.firstDayOfMonth(monthDate);
+    final endDate = DateFormatters.lastDayOfMonth(monthDate);
+
+    final results = await Future.wait([
+      _attendanceRepository.getByEmployeeAndDateRange(employeeId, startDate, endDate),
+      _attendanceRepository.countByTypeForEmployee(employeeId, startDate, endDate),
+    ]);
+
+    return EmployeeMonthHistory(
+      records: results[0] as List<AttendanceRecord>,
+      counts: results[1] as Map<String, int>,
+    );
+  }
 }
 
 /// Exception for attendance operations
@@ -266,4 +284,15 @@ class AttendanceException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Result of a single-employee monthly attendance history
+class EmployeeMonthHistory {
+  final List<AttendanceRecord> records;
+  final Map<String, int> counts;
+
+  const EmployeeMonthHistory({
+    required this.records,
+    required this.counts,
+  });
 }

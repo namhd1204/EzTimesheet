@@ -3,6 +3,7 @@ import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
 import '../repositories/repositories.dart';
+import '../services/services.dart';
 import '../utils/utils.dart';
 
 class EmployeeHistoryScreen extends StatefulWidget {
@@ -15,8 +16,7 @@ class EmployeeHistoryScreen extends StatefulWidget {
 }
 
 class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
-  final AttendanceRepository _attendanceRepository =
-      getIt<AttendanceRepository>();
+  final AttendanceService _attendanceService = getIt<AttendanceService>();
 
   DateTime _currentMonth = DateTime.now();
   List<AttendanceRecord> _records = [];
@@ -32,25 +32,15 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    final startDate = DateFormatters.firstDayOfMonth(_currentMonth);
-    final endDate = DateFormatters.lastDayOfMonth(_currentMonth);
-
     try {
-      final records = await _attendanceRepository.getByEmployeeAndDateRange(
+      final history = await _attendanceService.getEmployeeMonthHistory(
         widget.employee.id,
-        startDate,
-        endDate,
-      );
-
-      final counts = await _attendanceRepository.countByTypeForEmployee(
-        widget.employee.id,
-        startDate,
-        endDate,
+        _currentMonth,
       );
 
       setState(() {
-        _records = records;
-        _counts = counts;
+        _records = history.records;
+        _counts = history.counts;
         _isLoading = false;
       });
     } catch (e) {

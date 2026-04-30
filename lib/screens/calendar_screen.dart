@@ -104,6 +104,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Đóng'),
               ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // close dialog
+                  Navigator.pop(context, date); // close calendar and pass date
+                },
+                child: const Text('Chấm công ngay'),
+              ),
             ],
           ),
         );
@@ -394,6 +401,13 @@ class DayAttendanceDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Đóng'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context); // close dialog
+            Navigator.pop(context, date); // close calendar and pass date
+          },
+          child: const Text('Chỉnh sửa'),
         ),
       ],
     );
