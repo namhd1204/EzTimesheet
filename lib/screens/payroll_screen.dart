@@ -29,7 +29,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
   Map<String, MonthlyRate?> _rates = {};
   Map<String, PayrollResult?> _payrollResults = {};
   bool _isLoading = true;
-  bool _isCalculating = false;
   bool _isLocked = false;
   String? _errorMessage;
 
@@ -43,22 +42,28 @@ class _PayrollScreenState extends State<PayrollScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _payrollResults = {}; // Clear old results
     });
 
     try {
       final employees = await _employeeRepository.getAllActive();
       final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
+      final employeeIds = employees.map((e) => e.id).toList();
 
-      final isLocked = await _monthLockRepository.isLocked(monthString);
-      final ratesList = await _monthlyRateRepository.getByMonth(monthString);
-      final rates = <String, MonthlyRate?>{
-        for (final r in ratesList) r.employeeId: r
-      };
+      // Ensure rates exist for carry-over logic
+      await _payrollService.ensureRatesForMonth(employeeIds, monthString);
+      
+      // Batch fetch locked state, rates, and calculate results
+      final view = await _payrollService.getPayrollMonthView(
+        employeeIds,
+        monthString,
+      );
 
       setState(() {
         _employees = employees;
-        _rates = rates;
-        _isLocked = isLocked;
+        _rates = view.rates;
+        _payrollResults = view.results;
+        _isLocked = view.isLocked;
         _isLoading = false;
       });
     } catch (e) {
@@ -90,34 +95,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
     _loadData();
   }
 
-  Future<void> _calculatePayroll() async {
-    setState(() {
-      _isCalculating = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
-      final employeeIds = _employees.map((e) => e.id).toList();
-
-      await _payrollService.ensureRatesForMonth(employeeIds, monthString);
-      final view = await _payrollService.getPayrollMonthView(
-        employeeIds,
-        monthString,
-      );
-
-      setState(() {
-        _rates = view.rates; // Update rates in case carry-over generated new ones
-        _payrollResults = view.results;
-        _isCalculating = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = ErrorMessages.payrollCalculationFailed;
-        _isCalculating = false;
-      });
-    }
-  }
 
   Future<void> _configureRate(Employee employee) async {
     if (_isLocked) {
@@ -281,19 +258,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isCalculating ? null : _calculatePayroll,
-        child: _isCalculating
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Icon(Icons.calculate),
-      ),
     );
   }
 
