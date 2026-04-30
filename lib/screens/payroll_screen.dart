@@ -452,6 +452,12 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     ],
                   ),
                 ),
+                if (rate != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () => _configureRate(employee),
+                    tooltip: 'Sửa tiền công',
+                  ),
               ],
             ),
             const SizedBox(height: AppTheme.space3),
@@ -460,7 +466,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
             if (rate == null)
               _buildConfigureRateButton(employee)
             else if (payrollResult != null)
-              _buildPayrollResult(payrollResult)
+              _buildPayrollResult(payrollResult, rate)
             else
               _buildRateInfo(rate),
           ],
@@ -517,7 +523,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     );
   }
 
-  Widget _buildPayrollResult(PayrollResult result) {
+  Widget _buildPayrollResult(PayrollResult result, MonthlyRate rate) {
     return Container(
       padding: AppTheme.paddingSmall,
       decoration: BoxDecoration(
@@ -547,36 +553,51 @@ class _PayrollScreenState extends State<PayrollScreen> {
               ),
             ],
           ),
-          const SizedBox(height: AppTheme.space2),
-          _buildPayrollDetailRow('Ngày làm việc:', result.fullDays),
-          _buildPayrollDetailRow('Nửa ngày:', result.halfDays),
-          _buildPayrollDetailRow('Làm đêm:', result.nightWorkDays),
-          const SizedBox(height: AppTheme.space2),
-          _buildPayrollDetailRow('Tiền ngày:', result.fullDayTotal, isCurrency: true),
-          _buildPayrollDetailRow('Tiền nửa ngày:', result.halfDayTotal, isCurrency: true),
-          _buildPayrollDetailRow('Tiền làm đêm:', result.nightWorkTotal, isCurrency: true),
+          _buildPayrollDetailRow(
+            'Cả ngày:',
+            formula: '${result.fullDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} = ${CurrencyFormatters.formatVND(result.fullDayTotal)}',
+          ),
+          _buildPayrollDetailRow(
+            'Nửa ngày:',
+            formula: '${result.halfDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} x 0.5 = ${CurrencyFormatters.formatVND(result.halfDayTotal)}',
+          ),
+          _buildPayrollDetailRow(
+            'Làm đêm:',
+            formula: '${result.nightWorkDays} x ${CurrencyFormatters.formatVND(rate.nightBonus)} = ${CurrencyFormatters.formatVND(result.nightWorkTotal)}',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPayrollDetailRow(String label, dynamic value, {bool isCurrency = false}) {
+  Widget _buildPayrollDetailRow(String label, {required String formula}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: AppTheme.bodyLarge.copyWith(
-              color: AppTheme.textSecondary,
+          Expanded(
+            child: Text(
+              label,
+              style: AppTheme.bodyLarge.copyWith(
+                color: AppTheme.textSecondary,
+              ),
             ),
           ),
-          Text(
-            isCurrency
-                ? CurrencyFormatters.formatVND((value as num).toDouble())
-                : '$value',
-            style: AppTheme.bodyLarge,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryLight.withValues(alpha: 0.15),
+              borderRadius: AppTheme.borderRadiusMedium,
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              formula,
+              style: AppTheme.bodyLarge.copyWith(
+                color: AppTheme.primaryLight,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
