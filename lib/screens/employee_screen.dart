@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
-import 'employee_history_screen.dart';
 import '../utils/utils.dart';
 import '../repositories/repositories.dart';
 import 'settings_screen.dart';
@@ -225,19 +224,6 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.history),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            EmployeeHistoryScreen(employee: employee),
-                      ),
-                    );
-                  },
-                  tooltip: 'Lịch sử chấm công',
-                ),
                 IconButton(
                   icon: const Icon(Icons.visibility),
                   onPressed: () => _showEmployeeDetails(employee),

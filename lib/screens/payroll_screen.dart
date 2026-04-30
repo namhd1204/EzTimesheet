@@ -604,7 +604,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
         children: [
           Text(
             label,
-            style: AppTheme.bodySmall.copyWith(
+            style: AppTheme.bodyLarge.copyWith(
               color: AppTheme.textSecondary,
             ),
           ),
@@ -612,7 +612,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
             isCurrency
                 ? CurrencyFormatters.formatVND((value as num).toDouble())
                 : '$value',
-            style: AppTheme.bodySmall,
+            style: AppTheme.bodyLarge,
           ),
         ],
       ),
