@@ -50,3 +50,7 @@ web/
 
 EzTimesheet.code-workspace
 .continue
+
+.claude/settings.local.json
+
+.vscode
