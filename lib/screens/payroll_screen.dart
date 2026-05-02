@@ -20,14 +20,12 @@ class PayrollScreen extends StatefulWidget {
 class _PayrollScreenState extends State<PayrollScreen> {
   final EmployeeRepository _employeeRepository = getIt<EmployeeRepository>();
   final PayrollService _payrollService = getIt<PayrollService>();
-  final MonthLockRepository _monthLockRepository = getIt<MonthLockRepository>();
 
   DateTime _currentMonth = DateTime.now();
   List<Employee> _employees = [];
   Map<String, MonthlyRate?> _rates = {};
   Map<String, PayrollResult?> _payrollResults = {};
   bool _isLoading = true;
-  bool _isLocked = false;
   String? _errorMessage;
 
   @override
@@ -59,7 +57,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
         _employees = employees;
         _rates = view.rates;
         _payrollResults = view.results;
-        _isLocked = view.isLocked;
         _isLoading = false;
       });
     } catch (e) {
@@ -91,31 +88,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     _loadData();
   }
 
-
   Future<void> _configureRate(Employee employee) async {
-    if (_isLocked) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Dữ liệu đã chốt'),
-          content: const Text(
-              'Tháng này đã được chốt. Bạn có chắc muốn thay đổi cấu hình lương không?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Hủy'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child:
-                  const Text('Đồng ý', style: TextStyle(color: AppTheme.error)),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-    }
-
     if (!mounted) return;
     final result = await showDialog<bool>(
       context: context,
@@ -131,118 +104,12 @@ class _PayrollScreenState extends State<PayrollScreen> {
     }
   }
 
-  Future<void> _toggleLock() async {
-    final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
-    final monthDisplay = DateFormatters.formatMonth(_currentMonth);
-
-    if (!_isLocked) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Chốt dữ liệu $monthDisplay'),
-          content: Text(
-              'Sau khi chốt, dữ liệu chấm công và lương của tháng $monthDisplay sẽ được bảo vệ. Bạn có chắc chắn?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Hủy'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Chốt dữ liệu',
-                  style: TextStyle(color: AppTheme.primary)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        await _monthLockRepository.setLock(monthString, true);
-        _loadData();
-      }
-    } else {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Mở khóa dữ liệu $monthDisplay'),
-          content: const Text(
-              'Bạn đang mở khóa dữ liệu đã chốt. Bạn có chắc chắn muốn cho phép sửa đổi dữ liệu tháng này?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Hủy'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Mở khóa',
-                  style: TextStyle(color: AppTheme.error)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        await _monthLockRepository.setLock(monthString, false);
-        _loadData();
-      }
-    }
-  }
-
-  Future<void> _exportPayroll() async {
-    try {
-      final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
-      final employeeIds = _employees.map((e) => e.id).toList();
-
-      final payrollText = await _payrollService.exportPayroll(
-        employeeIds,
-        monthString,
-      );
-
-      // Copy to clipboard
-      await Clipboard.setData(ClipboardData(text: payrollText));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Đã sao chép bảng lương vào clipboard'),
-            action: SnackBarAction(
-              label: 'OK',
-              onPressed: () {},
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(ErrorMessages.generalError)),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(DateFormatters.formatMonth(_currentMonth)),
         actions: [
-          IconButton(
-            icon: Icon(_isLocked ? Icons.lock : Icons.lock_open),
-            onPressed: _toggleLock,
-            tooltip: _isLocked ? 'Mở khóa tháng' : 'Chốt tháng',
-            color: _isLocked ? AppTheme.primary : null,
-          ),
-          IconButton(
-            icon: const Icon(Icons.today),
-            onPressed: _goToToday,
-            tooltip: 'Hôm nay',
-          ),
-          IconButton(
-            icon: const Icon(Icons.file_download),
-            onPressed: _exportPayroll,
-            tooltip: 'Xuất bảng lương',
-          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.push(
@@ -551,15 +418,18 @@ class _PayrollScreenState extends State<PayrollScreen> {
           ),
           _buildPayrollDetailRow(
             'Cả ngày:',
-            formula: '${result.fullDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} = ${CurrencyFormatters.formatVND(result.fullDayTotal)}',
+            formula:
+                '${result.fullDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} = ${CurrencyFormatters.formatVND(result.fullDayTotal)}',
           ),
           _buildPayrollDetailRow(
             'Nửa ngày:',
-            formula: '${result.halfDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} x 0.5 = ${CurrencyFormatters.formatVND(result.halfDayTotal)}',
+            formula:
+                '${result.halfDays} x ${CurrencyFormatters.formatVND(rate.dailyRate)} x 0.5 = ${CurrencyFormatters.formatVND(result.halfDayTotal)}',
           ),
           _buildPayrollDetailRow(
             'Làm đêm:',
-            formula: '${result.nightWorkDays} x ${CurrencyFormatters.formatVND(rate.nightBonus)} = ${CurrencyFormatters.formatVND(result.nightWorkTotal)}',
+            formula:
+                '${result.nightWorkDays} x ${CurrencyFormatters.formatVND(rate.nightBonus)} = ${CurrencyFormatters.formatVND(result.nightWorkTotal)}',
           ),
         ],
       ),
@@ -585,7 +455,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
             decoration: BoxDecoration(
               color: AppTheme.primaryLight.withValues(alpha: 0.15),
               borderRadius: AppTheme.borderRadiusMedium,
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
             ),
             child: Text(
               formula,
