@@ -54,3 +54,8 @@ EzTimesheet.code-workspace
 .claude/settings.local.json
 
 .vscode
+
+ios/
+linux/
+macos/
+windows/
