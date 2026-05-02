@@ -30,6 +30,10 @@ Future<void> setupServiceLocator() async {
   // Services
   getIt.registerSingleton<GoogleDriveService>(GoogleDriveService());
   
+  getIt.registerSingleton<RateInheritancePolicy>(
+    RateInheritancePolicy(getIt<MonthlyRateRepository>()),
+  );
+  
   getIt.registerSingleton<AttendanceService>(
     AttendanceService(
       getIt<AttendanceRepository>(),
@@ -42,6 +46,7 @@ Future<void> setupServiceLocator() async {
       getIt<AttendanceRepository>(),
       getIt<MonthlyRateRepository>(),
       getIt<MonthLockRepository>(),
+      getIt<RateInheritancePolicy>(),
     ),
   );
   getIt.registerSingleton<BackupService>(

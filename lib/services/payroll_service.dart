@@ -1,16 +1,19 @@
 import '../models/models.dart';
 import '../repositories/repositories.dart';
+import './rate_inheritance_policy.dart';
 
 /// Service for payroll calculations
 class PayrollService {
   final AttendanceRepository _attendanceRepository;
   final MonthlyRateRepository _monthlyRateRepository;
   final MonthLockRepository _monthLockRepository;
+  final RateInheritancePolicy _rateInheritancePolicy;
 
   PayrollService(
     this._attendanceRepository,
     this._monthlyRateRepository,
     this._monthLockRepository,
+    this._rateInheritancePolicy,
   );
 
   /// Calculate payroll for employee in a specific month
@@ -20,27 +23,11 @@ class PayrollService {
     String month, // Format: YYYY-MM
   ) async {
     try {
-      // Get monthly rate for employee
-      var rate = await _monthlyRateRepository.getByEmployeeAndMonth(
-        employeeId,
-        month,
-      );
+      // Use policy to ensure or inherit rate
+      var rate = await _rateInheritancePolicy.ensureOrInherit(employeeId, month);
 
       if (rate == null) {
-        // Carry-over logic: Get most recent previous rate
-        final latestRate = await _monthlyRateRepository.getLatestRate(employeeId);
-        if (latestRate != null) {
-          // Create new rate for this month based on latest
-          rate = MonthlyRate(
-            employeeId: employeeId,
-            month: month,
-            dailyRate: latestRate.dailyRate,
-            nightBonus: latestRate.nightBonus,
-          );
-          await _monthlyRateRepository.create(rate);
-        } else {
-          throw PayrollException('Lỗi: Chưa cấu hình lương cho nhân viên này trong tháng $month và không có dữ liệu cũ để kế thừa.');
-        }
+        throw PayrollException('Lỗi: Chưa cấu hình lương cho nhân viên này trong tháng $month và không có dữ liệu cũ để kế thừa.');
       }
 
       // Parse month to get date range
@@ -94,35 +81,27 @@ class PayrollService {
     }
   }
 
-  /// Ensure rates exist for all employees in a month (carry-over logic)
-  Future<void> ensureRatesForMonth(
+  /// Prepare rates for all employees in a month using inheritance policy.
+  /// This is called internally by getPayrollMonthView().
+  /// 
+  /// Screens can optionally call this directly before fetching payroll,
+  /// but it will be called automatically during getPayrollMonthView().
+  Future<Set<String>> prepareRatesForMonth(
     List<String> employeeIds,
     String month,
   ) async {
-    final existingRates = await _monthlyRateRepository.getByMonth(month);
-    final existingIds = existingRates.map((r) => r.employeeId).toSet();
-
-    for (final id in employeeIds) {
-      if (!existingIds.contains(id)) {
-        final latestRate = await _monthlyRateRepository.getLatestRate(id);
-        if (latestRate != null) {
-          final rate = MonthlyRate(
-            employeeId: id,
-            month: month,
-            dailyRate: latestRate.dailyRate,
-            nightBonus: latestRate.nightBonus,
-          );
-          await _monthlyRateRepository.create(rate);
-        }
-      }
-    }
+    return _rateInheritancePolicy.ensureOrInheritForAll(employeeIds, month);
   }
 
   /// Batch load payroll view for the month — replaces N+1 in Screen.
+  /// Automatically prepares rates using the inheritance policy.
   Future<PayrollMonthView> getPayrollMonthView(
     List<String> employeeIds,
     String month,
   ) async {
+    // First, ensure or inherit rates for all employees
+    await prepareRatesForMonth(employeeIds, month);
+    
     final parts = month.split('-');
     final year = int.parse(parts[0]);
     final monthNum = int.parse(parts[1]);

@@ -48,10 +48,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
       final monthString = DateFormatters.formatMonthForStorage(_currentMonth);
       final employeeIds = employees.map((e) => e.id).toList();
 
-      // Ensure rates exist for carry-over logic
-      await _payrollService.ensureRatesForMonth(employeeIds, monthString);
-      
       // Batch fetch locked state, rates, and calculate results
+      // (Rates are automatically inherited/prepared internally)
       final view = await _payrollService.getPayrollMonthView(
         employeeIds,
         monthString,
