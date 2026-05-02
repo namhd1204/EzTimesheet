@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../design_system/app_theme.dart';
 import '../di/service_locator.dart';
 import '../models/models.dart';
@@ -77,13 +76,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
   void _nextMonth() {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-    });
-    _loadData();
-  }
-
-  void _goToToday() {
-    setState(() {
-      _currentMonth = DateTime.now();
     });
     _loadData();
   }
